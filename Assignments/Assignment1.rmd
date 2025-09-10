@@ -169,10 +169,10 @@ theta_google_ads <- beta_google_ads * (avg_sales / avg_google_ads)
 theta_facebook <- beta_facebook * (avg_sales / avg_facebook)
 
 
-# # Calculate spend per channel (code run in a chunck above)
-# google_spend <- sum(data$google_ads)
-# facebook_spend <- sum(data$facebook)
-# tiktok_spend <- sum(data$tiktok)
+# Calculate spend per channel 
+google_spend <- sum(data$google_ads)
+facebook_spend <- sum(data$facebook)
+tiktok_spend <- sum(data$tiktok)
 
 # Each media's contribution to sales
 tiktok_contribution  <- theta_tiktok  * tiktok_spend
@@ -319,10 +319,10 @@ bar_plot4
 
 
 ```{r}
-# Calculate spend per channel
-google_spend <- sum(data$google_ads)
-facebook_spend <- sum(data$facebook)
-tiktok_spend <- sum(data$tiktok)
+# # Calculate spend per channel (done on code chuck above)
+# google_spend <- sum(data$google_ads)
+# facebook_spend <- sum(data$facebook)
+# tiktok_spend <- sum(data$tiktok)
 
 # Combine into a vector
 spend <- c(google_spend, facebook_spend, tiktok_spend)
