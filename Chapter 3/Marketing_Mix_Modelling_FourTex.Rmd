@@ -1,0 +1,553 @@
+---
+title: "Marketing Mix Modelling (MMM)"
+subtitle: "Case Study: FourTex"
+author: "Rishi Ashok Kumar"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: flatly
+    df_print: paged
+  pdf_document:
+    toc: true
+    number_sections: true
+editor_options:
+  chunk_output_type: console
+---
+
+> A tidy, documented MMM workflow you can knit end‑to‑end.  
+> Data expected in the working directory as **`data_fourtex.csv`** with columns:
+> `Google_Adwords, Facebook, TV, Radio, traffic` (weekly observations).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 8, fig.height = 4.5, dpi = 120
+)
+```
+
+# Setup
+
+---
+
+```{r libraries}
+# Core
+library(tidyverse)
+library(scales)
+library(ggplot2)
+
+
+```
+
+```{r read-data}
+# Read data ---------------------------------------------------------------
+stopifnot(file.exists("data_fourtex.csv"))
+data <- readr::read_csv("data_fourtex.csv", show_col_types = FALSE)
+
+```
+
+```{r}
+glimpse(data)
+summary(data)
+```
+
+
+
+```{r sanity-checks}
+
+## Quick sanity checks
+
+# Check for missing or negative values (spend should be >= 0)
+colSums(is.na(data))
+summary(select(data, Google_Adwords, Facebook, TV, Radio, traffic) < 0)
+```
+
+
+
+```{r make-ts}
+
+# Time series preparation
+
+## We assume weekly data with 52 observations per year. The first observation is set to **2020, week 28** to mirror your original script. The exact calendar date is not critical for the model, but it helps for readable plots.
+
+# Extract series as vectors
+google_adwords <- data$Google_Adwords
+facebook       <- data$Facebook
+tv             <- data$TV
+radio          <- data$Radio
+traffic        <- data$traffic
+
+# Build ts objects (weekly frequency)
+google_adwords <- ts(google_adwords, frequency = 52, start = c(2020, 28))
+facebook       <- ts(facebook,frequency = 52, start = c(2020, 28))
+tv             <- ts(tv,frequency = 52, start = c(2020, 28))
+radio.         <- ts(radio,frequency = 52, start = c(2020, 28))
+traffic.       <- ts(traffic,frequency = 52, start = c(2020, 28))
+
+online_total   <- google_adwords + facebook
+offline_total  <- tv + radio
+
+```
+
+
+#  Visual inspection
+
+---
+
+```{r base-plots}
+par(mfrow = c(3,1), mar = c(3,4,2,1))
+plot(traffic, type = "l", col = "steelblue", main = "Traffic (weekly)", ylab = "Sessions", xlab = "")
+plot(online_total, col = "darkgreen", main = "Online spend (Adwords + Facebook)", ylab = "Spend", xlab = "")
+plot(offline_total, col = "firebrick", main = "Offline spend (TV + Radio)", ylab = "Spend", xlab = "")
+```
+
+## Observations from Traffic and Advertising Plots
+
+1. **Coinciding spikes**  
+   - Online traffic spikes around late 2020 and early 2021.  
+   - These spikes align with periods of heavy online and offline ad spend.  
+
+2. **Offline spend is bursty**  
+   - Offline spend shows sharp spikes followed by periods of zero spend.  
+   - This reflects campaign-style media such as TV and radio.  
+
+3. **Online spend is steadier**  
+   - Online spend maintains a more continuous presence, with noticeable peaks during promotions or seasonal campaigns.  
+
+4. **Traffic mirrors marketing push**  
+   - Peaks in traffic line up with bursts in offline campaigns and increases in online spending.  
+   - However, a baseline level of traffic exists that is not entirely explained by advertising.  
+
+5. **Seasonality and trends**  
+   - No strong seasonal trend is clear from the short time window (~1.5 years).  
+   - However, recurring spikes suggest possible alignment with promotions, holidays, or budget cycles.  
+
+---
+
+**Key takeaway:**  
+Offline ads generate **large, short-lived boosts** in traffic, while online ads provide a **more consistent stream of influence**. When both peak together, they reinforce traffic growth. This supports the view that ad spend has a direct impact on traffic.
+
+#  Media spending share
+
+---
+
+```{r media-share}
+### Media spending share
+sum_online  <- sum(online_total)
+sum_offline <- sum(offline_total)
+total_spend <- sum_online + sum_offline
+
+online_share  <- sum_online / total_spend
+offline_share <- sum_offline / total_spend
+
+# Pie chart for Media Spending Share
+slices <- c(online_share, offline_share)
+lbls   <- c("Online", "Offline")
+
+# Add percentage labels
+pct   <- round(slices * 100)
+lbls  <- paste(lbls, pct, "%", sep=" ")
+
+par(mfrow = c(1, 1))
+pie(slices,
+    labels = lbls,
+    col = rainbow(length(lbls)),
+    main = "Ad Spending Share")
+```
+
+# Why log transformations?
+
+## Log Transformations in Marketing Mix Models
+
+- Advertising often exhibits **diminishing returns**: each extra dollar spent drives less additional sales/traffic.  
+- The natural logarithm function, `log(x)`, captures this shape automatically: it rises quickly at first, then flattens out.  
+- Logging variables also helps **stabilize variance** and reduce skewness in the data.  
+
+---
+
+## Why do we add `+1`?
+- `log(0)` is **undefined** (goes to negative infinity).  
+- Since marketing spend or impressions may contain **zero values** (e.g., weeks with no ads), we shift the data slightly:  
+  ```r
+  log(x + 1)
+  ```
+- This ensures the log is always valid:
+  - If `x = 0`, then `log(0+1) = 0`.  
+  - If `x > 0`, the shift has a very small effect.  
+
+---
+
+## How to interpret regression coefficients
+
+1. **Log-Log model**
+   - Model:  
+     \[
+     \ln(Y) = \alpha + \beta \ln(X)
+     \]
+   - Interpretation:  
+     - **β = elasticity**  
+     - A 1% increase in \(X\) leads to a **β% change in \(Y\)**.  
+     - Example: If β = 0.4, then a 1% increase in spend increases sales by 0.4%.  
+
+---
+
+2. **Semi-log models**
+   - **Log-linear (log Y only)**  
+     \[
+     \ln(Y) = \alpha + \beta X
+     \]  
+     - A 1-unit increase in \(X\) changes \(Y\) by \((e^{\beta} - 1)\times 100\%\).  
+     - Approximation: if β is small, then each unit of \(X\) gives about \(100 \times β\%\) change in \(Y\).  
+
+   - **Linear-log (log X only)**  
+     \[
+     Y = \alpha + \beta \ln(X)
+     \]  
+     - A 1% increase in \(X\) changes \(Y\) by \(\beta / 100\) units.  
+     - Captures diminishing returns in \(X\), but keeps \(Y\) in levels.  
+
+---
+
+**Summary:**  
+- **Log-log** is the most common in MMM because elasticity (%↔%) is intuitive.  
+- **Semi-log** is useful when only one side grows nonlinearly.  
+- Adding `+1` ensures zeros don’t break the log transformation. 
+
+---
+
+## What we’re predicting in this model
+
+In our MMM, we **predict weekly web traffic** using last week’s traffic (to capture persistence) and the **same-week ad spend** in each channel. We estimate a **log–log** specification so the media coefficients can be read as **elasticities** (percent–percent effects):
+
+\[
+\ln(\mathrm{Traffic}_t) \;=\; \beta_0 
++ \beta_1 \ln(\mathrm{Traffic}_{t-1}) 
++ \beta_2 \ln(\mathrm{Adwords}_t) 
++ \beta_3 \ln(\mathrm{Facebook}_t) 
++ \beta_4 \ln(\mathrm{TV}_t) 
++ \beta_5 \ln(\mathrm{Radio}_t) 
++ \epsilon_t
+\]
+
+**How to read it:**
+- \(\beta_1\): **carryover/persistence** — how strongly last week’s traffic predicts this week’s.
+- \(\beta_{2..5}\): **media elasticities** — a **1%** increase in that channel’s spend changes traffic by **\(\beta\%\)** (holding other factors constant).
+- \(\beta_0\): **baseline log-traffic** when all predictors are at 1 (in practice, the intercept).
+- \(\epsilon_t\): **random error**.
+
+> *Implementation note:* in code we use `log(x + 1)` for media and traffic to handle zero spend/weeks gracefully while preserving the elasticity interpretation.
+
+
+
+```{r build-model-data}
+# converting all the variable to logs
+ln_google_adwords <- log(google_adwords + 1)
+ln_facebook       <- log(facebook + 1)
+ln_tv             <- log(tv + 1)
+ln_radio          <- log(radio + 1)
+ln_traffic        <- log(traffic + 1)
+
+# Creating Lagged Traffic Variable
+m <- 1  # one lag
+
+# number of observations
+n <- length(traffic)
+
+# Build lagged variable
+Lag1_ln_traffic <- c(rep(NA, m), ln_traffic[1:(n - m)])
+
+```
+
+```{r fit-model}
+
+# Fit a Regression
+options(scipen = 999)  # prevent scientific notation
+
+ln_traffic <- ts(ln_traffic, frequency = 52, start = c(2020, 28))
+
+regression1 <- lm(
+  ln_traffic ~ Lag1_ln_traffic + ln_google_adwords + ln_facebook + ln_tv + ln_radio
+)
+
+# Show regression summary
+summary(regression1)
+```
+
+# Actual vs fitted
+
+```{r actual-vs-fitted}
+
+# Create fitted traffic as a time series
+fitted_traffic <- ts(regression1$fitted.values, frequency = 52, start = c(2020, 28))
+
+# Plot actual vs fitted
+plot(ln_traffic, type = "l", col = "blue", lwd = 2,
+     main = "Web Traffic", ylab = "Log Traffic", xlab = "Time")
+
+lines(fitted_traffic, col = "red", lwd = 2)
+
+legend("topleft",
+       lty = 1, col = c("blue", "red"),
+       legend = c("Logged Traffic Data", "Fitted"))
+```
+
+# 7) Contributions & ROI (TROMI)
+
+We convert elasticities to **unit effects** around the average level to estimate **contribution to traffic** and **traffic ROI**:
+\[
+\frac{dY}{dX} \approx \beta \cdot \frac{\bar{Y}}{\bar{X}} \quad \Rightarrow \quad
+\text{contribution} \approx \theta \times \text{spend}
+\]
+
+```{r contributions}
+#retrieve model coefficients 
+
+beta_adwords <- summary(regression1)$coefficients[3,1] #row three column one 
+beta_facebook <- summary(regression1)$coefficients[4,1]  
+beta_tv <- summary(regression1)$coefficients[5,1] 
+beta_radio <- summary(regression1)$coefficients[6,1] 
+
+# calculate the baseline average traffic 
+avg_traffic <- mean(traffic)
+
+# calculate the baseline average advertising spending for each media:
+avg_adwords <- mean(google_adwords)
+avg_facebook <- mean(facebook)
+avg_tv <- mean(tv)
+avg_radio <- mean(radio)
+
+# Calculate the unit effect 
+theta_adwords <- beta_adwords * (avg_traffic / avg_adwords)
+theta_facebook <- beta_facebook * (avg_traffic / avg_facebook)
+theta_tv <- beta_tv * (avg_traffic / avg_tv)
+theta_radio <- beta_radio * (avg_traffic / avg_radio)
+
+# Display results
+theta_adwords
+theta_facebook
+theta_tv
+theta_radio
+```
+
+```{r contributions-traffic}
+# How much traffic did we get thanks to TV, Adwords, etc.?
+
+# Total spend for each channel
+sum_adwords  <- sum(google_adwords)
+sum_facebook <- sum(facebook)
+sum_tv       <- sum(tv)
+sum_radio    <- sum(radio)
+
+# Each media's contribution to traffic
+adwords_contribution  <- theta_adwords  * sum_adwords
+facebook_contribution <- theta_facebook * sum_facebook
+tv_contribution       <- theta_tv       * sum_tv
+radio_contribution    <- theta_radio    * sum_radio
+
+```
+
+```{r contribution-plot}
+# Barplot information
+media_contribution <- c(adwords_contribution, facebook_contribution,
+                        tv_contribution, radio_contribution)
+
+# Round contributions to whole numbers
+media_contribution <- round(media_contribution, digits = 0)
+
+# Media names
+media_names <- c("Adwords", "Facebook", "TV", "Radio")
+
+# Create data frame
+df <- data.frame(media_names, media_contribution)
+
+# Barplot
+bar_plot <- ggplot(data = df, aes(x = media_names, y = media_contribution)) +
+  geom_bar(stat = "identity", color = "black",
+           fill = c("red", "orange", "blue", "green")) +
+  geom_text(aes(label = media_contribution),
+            vjust = -0.3, size = 3.5) +
+  labs(title = "Contribution to Traffic",
+       x = "Media", y = "Contribution") +
+  theme_minimal()
+
+# Change the order of the bars
+bar_plot + scale_x_discrete(limits = c("Facebook", "Adwords", "Radio", "TV"))
+```
+
+```{r pct-contribution}
+# Total contribution from all media
+allmedia_contribution <- adwords_contribution + facebook_contribution +
+                         tv_contribution + radio_contribution
+
+# Percentage contributions
+adwords_pct  <- adwords_contribution  / allmedia_contribution
+facebook_pct <- facebook_contribution / allmedia_contribution
+tv_pct       <- tv_contribution       / allmedia_contribution
+radio_pct    <- radio_contribution    / allmedia_contribution
+
+# Put into a vector
+pct_contribution <- c(adwords_pct, facebook_pct, tv_pct, radio_pct)
+
+# Convert to percentage format
+pct_contribution <- percent(pct_contribution)
+
+# Media names
+media_names <- c("Adwords", "Facebook", "TV", "Radio")
+
+# Data frame
+df2 <- data.frame(media_names, pct_contribution)
+
+# Barplot for percentage contributions
+bar_plot_pct <- ggplot(data = df2, aes(x = media_names, y = pct_contribution)) +
+  geom_bar(stat = "identity", color = "black",
+           fill = c("red", "orange", "blue", "green")) +
+  geom_text(aes(label = pct_contribution),
+            vjust = -0.3, size = 3.5) +
+  labs(title = "Percentage Contribution to Traffic",
+       x = "Media", y = "Percentage") +
+  theme_minimal()
+
+# Change the order of the bars
+bar_plot_pct + scale_x_discrete(limits = c("Facebook", "Adwords", "Radio", "TV"))
+
+```
+
+```{r}
+# Calculate the cost of each media
+cost_adwords  <- sum(google_adwords)
+cost_facebook <- sum(facebook)
+cost_tv       <- sum(tv)
+cost_radio    <- sum(radio)
+
+# Total cost
+cost_total <- cost_adwords + cost_facebook + cost_tv + cost_radio
+
+# Vector of costs
+cost <- c(cost_adwords, cost_facebook, cost_tv, cost_radio)
+cost <- round(cost, digits = 0)
+
+# Traffic Contribution vs Cost Data Frame
+df3 <- data.frame(
+  traf_cost = rep(c("Traffic", "Cost"), each = 4),
+  media_names = rep(c("Adwords", "Facebook", "TV", "Radio"), 2),
+  values = c(media_contribution, cost)
+)
+
+
+```
+
+# Actual vs **optimal** budget split (elasticity rule)
+
+A simple rule-of-thumb allocates budget **proportional to elasticities** (assuming equal prices per traffic unit and no constraints).
+
+```{r}
+
+
+# Grouped barplot: Traffic vs Cost
+bar_plot3 <- ggplot(data = df3, aes(x = media_names, y = values, fill = traf_cost)) +
+  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
+  labs(title = "Traffic vs. Media Cost",
+       x = "Media", y = "Traffic and Cost") +
+  theme_minimal() +
+  scale_x_discrete(limits = c("Facebook", "Adwords", "TV", "Radio"))
+
+# Display the plot
+bar_plot3
+
+```
+
+```{r}
+
+
+# Calculate the traffic return (TROMI) for each media
+roi_adwords  <- adwords_contribution  / cost_adwords
+roi_facebook <- facebook_contribution / cost_facebook
+roi_tv       <- tv_contribution       / cost_tv
+roi_radio    <- radio_contribution    / cost_radio
+
+# Put ROI values into a vector
+roi <- c(roi_adwords, roi_facebook, roi_tv, roi_radio)
+
+# Round ROI values
+roi <- round(roi, digits = 2)
+
+# Create data frame
+media_names <- c("Adwords", "Facebook", "TV", "Radio")
+df4 <- data.frame(media_names, roi)
+
+# Preview
+head(df4)
+
+# TROMI bar plot
+bar_plot4 <- ggplot(data = df4, aes(x = media_names, y = roi)) +
+  geom_bar(stat = "identity", color = "black",
+           fill = c("red", "orange", "blue", "green")) +
+  geom_text(aes(label = roi),
+            vjust = -0.3, size = 3.5) +
+  labs(title = "Traffic Return on Marketing Investment (TROMI)",
+       x = "Media", y = "TROMI (Traffic per Unit Spend)") +
+  theme_minimal() +
+  scale_x_discrete(limits = c("Facebook", "Adwords", "Radio", "TV"))
+
+# Display plot
+bar_plot4
+
+```
+```{r}
+# Actual Budget Spending Shares
+costshare_adwords  <- cost_adwords  / cost_total
+costshare_facebook <- cost_facebook / cost_total
+costshare_tv       <- cost_tv       / cost_total
+costshare_radio    <- cost_radio    / cost_total
+
+# Input for the pie chart
+slices_actual <- c(costshare_adwords, costshare_facebook, costshare_tv, costshare_radio)
+lbls_actual   <- c("Adwords", "Facebook", "TV", "Radio")
+
+# Add percentages to labels
+pct_actual   <- round(slices_actual * 100)
+lbls_actual  <- paste(lbls_actual, pct_actual, "%")
+
+# Pie chart
+pie(slices_actual,
+    labels = lbls_actual,
+    col = rainbow(length(lbls_actual)),
+    main = "Actual Ad Spending")
+
+```
+```{r}
+# The sum of all media elasticities
+beta_allmedia <- beta_adwords + beta_facebook + beta_tv + beta_radio
+
+# Optimal resource allocation (budget share by elasticity)
+optim_adwords  <- beta_adwords  / beta_allmedia
+optim_facebook <- beta_facebook / beta_allmedia
+optim_tv       <- beta_tv       / beta_allmedia
+optim_radio    <- beta_radio    / beta_allmedia
+
+# Pie-chart ingredients for optimal allocation
+slices_optim <- c(optim_adwords, optim_facebook, optim_tv, optim_radio)
+slices_optim <- round(slices_optim, digits = 2)
+
+lbls_optim <- c("Adwords", "Facebook", "TV", "Radio")
+pct_optim  <- round(slices_optim * 100)
+
+# Add percentage labels
+lbls_optim <- paste(lbls_optim, pct_optim, "%")
+
+# Pie chart
+pie(slices_optim,
+    labels = lbls_optim,
+    col = rainbow(length(lbls_optim)),
+    main = "Optimal Budget Allocation")
+
+
+```
+
+
+
+
+
