@@ -1,0 +1,90 @@
+---
+title: "Marketing Mix Modelling (MMM)"
+subtitle: "Group Assignment 1"
+
+---
+
+
+```{r libraries}
+# Core
+library(tidyverse)
+library(scales)
+library(ggplot2)
+library(dplyr)
+```
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 8, fig.height = 4.5, dpi = 120
+)
+
+```
+```
+
+```{r read-data}
+# Read data ---------------------------------------------------------------
+stopifnot(file.exists("marketing_mix_assignment.csv"))
+data <- readr::read_csv("marketing_mix_assignment.csv", show_col_types = FALSE)
+
+```
+
+
+```{r}
+
+data <- data %>%
+  rename(
+    google_ads = `Google Ads`,
+    facebook   = Facebook,
+    tiktok     = TikTok,
+    sales      = Sales,
+    week       = Date
+  )
+
+# Now these work without backticks
+colSums(is.na(select(data, google_ads, facebook, tiktok, sales)))
+
+# Negative-value counts per column
+sapply(select(data, google_ads, facebook, tiktok, sales), function(x) sum(x < 0, na.rm = TRUE))
+
+# If you want separate vectors:
+google_ads <- data$google_ads
+facebook   <- data$facebook
+tiktok     <- data$tiktok
+sales      <- data$sales
+
+```
+
+
+```{r}
+matplot(
+  x = data$week,
+  y = cbind(data$google_ads, data$facebook, data$tiktok),
+  type = "l", lty = 1, lwd = 2,
+  xlab = "", ylab = "Spend",
+  main = "Ad Spend by Channel Over Time",
+  col = c("steelblue", "dodgerblue3", "darkturquoise")
+)
+legend("topleft", inset = 0.02,
+       legend = c("Google Ads", "Facebook", "TikTok"),
+       col = c("steelblue", "dodgerblue3", "darkturquoise"),
+       lty = 1, lwd = 2, bty = "n")
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
