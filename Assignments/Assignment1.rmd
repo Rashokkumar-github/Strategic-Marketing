@@ -15,20 +15,13 @@ library(dplyr)
 
 
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(
-  echo = TRUE, message = FALSE, warning = FALSE,
-  fig.width = 8, fig.height = 4.5, dpi = 120
-)
-
-```
-```
-
 ```{r read-data}
 # Read data ---------------------------------------------------------------
 stopifnot(file.exists("marketing_mix_assignment.csv"))
 data <- readr::read_csv("marketing_mix_assignment.csv", show_col_types = FALSE)
 
+glimpse(data)
+str(data)
 ```
 
 
@@ -39,48 +32,340 @@ data <- data %>%
     google_ads = `Google Ads`,
     facebook   = Facebook,
     tiktok     = TikTok,
-    sales      = Sales,
-    week       = Date
-  )
+    sales      = Sales
+  ) 
 
-# Now these work without backticks
+# "09/10/2025"  (mm/dd/yyyy)
+data$Date <- as.Date(data$Date, format = "%m/%d/%Y")
+
+
+# check for missing data
 colSums(is.na(select(data, google_ads, facebook, tiktok, sales)))
 
 # Negative-value counts per column
 sapply(select(data, google_ads, facebook, tiktok, sales), function(x) sum(x < 0, na.rm = TRUE))
 
-# If you want separate vectors:
-google_ads <- data$google_ads
-facebook   <- data$facebook
-tiktok     <- data$tiktok
-sales      <- data$sales
+str(data)
+
+```
+
+
+
+
+
+z
+```{r}
+
+# Desired facet order (top → bottom)
+order_levels <- c("Sales", "Google Ads", "Facebook", "TikTok")
+
+long <- data %>%
+  select(Date, Sales = sales, `Google Ads` = google_ads,
+         Facebook = facebook, TikTok = tiktok) %>%
+  pivot_longer(-Date, names_to = "series", values_to = "value") %>%
+  mutate(
+    series = factor(series, levels = order_levels)  # puts Sales first
+  )
+
+ggplot(long, aes(Date, value, color = series)) +
+  geom_line(linewidth = 0.9) +
+  facet_wrap(~ series, ncol = 1, scales = "free_y") +
+  scale_color_manual(values = c(
+    "Sales"      = "orange",
+    "Google Ads" = "steelblue",
+    "Facebook"   = "firebrick",
+    "TikTok"     = "darkgreen"
+  )) +
+  labs(title = "Weekly Performance by Channel", x = NULL, y = NULL) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
+  scale_y_continuous(labels = label_dollar(prefix = "$")) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "none")
+
 
 ```
 
 
 ```{r}
-matplot(
-  x = data$week,
-  y = cbind(data$google_ads, data$facebook, data$tiktok),
-  type = "l", lty = 1, lwd = 2,
-  xlab = "", ylab = "Spend",
-  main = "Ad Spend by Channel Over Time",
-  col = c("steelblue", "dodgerblue3", "darkturquoise")
-)
-legend("topleft", inset = 0.02,
-       legend = c("Google Ads", "Facebook", "TikTok"),
-       col = c("steelblue", "dodgerblue3", "darkturquoise"),
-       lty = 1, lwd = 2, bty = "n")
+google_ads <- data$google_ads
+facebook <- data$facebook
+tiktok <- data$tiktok
+sales <- data$sales
 
+freq <- 200
+start_ts <- c(2018, 1)
+
+google_ads <- ts(google_ads, frequency = freq, start = start_ts)
+facebook   <- ts(facebook,   frequency = freq, start = start_ts)
+tiktok     <- ts(tiktok,     frequency = freq, start = start_ts)
+sales      <- ts(sales,      frequency = freq, start = start_ts)
+
+# Log transforms (already started these)
+ln_google_ads <- log(google_ads + 1)
+ln_facebook   <- log(facebook   + 1)
+ln_tiktok     <- log(tiktok     + 1)
+ln_sales      <- log(sales      + 1)
+
+
+# Creating Lagged Sales Variable
+m <- 1  # one lag
+
+# number of observations
+n <- length(sales)
+
+# Build lagged variable
+Lag1_ln_sales <- c(rep(NA, m), ln_sales[1:(n - m)])
+
+```
+
+
+```{r}
+# Fit a Regression
+options(scipen = 999)  # prevent scientific notation
+
+regression1 <- lm(
+  ln_sales ~ Lag1_ln_sales + ln_google_ads + ln_facebook + ln_tiktok
+)
+
+# Show regression summary
+summary(regression1)
+```
+
+```{r}
+# Create fitted traffic as a time series
+fitted_sales <- ts(regression1$fitted.values, frequency = freq, start = start_ts)
+
+# Plot actual vs fitted
+plot(ln_sales, type = "l", col = "blue", lwd = 2,
+     main = "Web Traffic", ylab = "Log Sales", xlab = "Time")
+
+lines(fitted_sales, col = "red", lwd = 2)
+
+legend("bottomright",
+       lty = 1, col = c("blue", "red"),
+       legend = c("Logged Traffic Data", "Fitted"),
+       cex = 0.75)
+```
+
+```{r}
+#retrieve model coefficients 
+
+beta_google_ads <- summary(regression1)$coefficients[3,1] #row three column one 
+beta_facebook <- summary(regression1)$coefficients[4,1]  
+beta_tiktok <- summary(regression1)$coefficients[5,1]
+
+# calculate the baseline average sales
+avg_sales <- mean(sales)
+
+# calculate the baseline average advertising spending for each media:
+avg_google_ads <- mean(google_ads)
+avg_facebook <- mean(facebook)
+avg_tiktok <- mean(tiktok)
+
+# Calculate the unit effect 
+theta_tiktok <- beta_tiktok * (avg_sales / avg_tiktok)
+theta_google_ads <- beta_google_ads * (avg_sales / avg_google_ads)
+theta_facebook <- beta_facebook * (avg_sales / avg_facebook)
+
+
+# # Calculate spend per channel (code run in a chunck above)
+# google_spend <- sum(data$google_ads)
+# facebook_spend <- sum(data$facebook)
+# tiktok_spend <- sum(data$tiktok)
+
+# Each media's contribution to sales
+tiktok_contribution  <- theta_tiktok  * tiktok_spend
+google_ads_contribution  <- theta_google_ads  * google_spend
+facebook_contribution <- theta_facebook * facebook_spend
 
 
 
 ```
 
+```{r}
+# Barplot information
+media_contribution <- c(tiktok_contribution, google_ads_contribution, facebook_contribution)
+                      
+# Round contributions to whole numbers
+media_contribution <- round(media_contribution, digits = 0)
+
+# Media names
+media_names <- c("Tiktok", "Google Ads", "Facebook")
+
+# Create data frame
+df <- data.frame(media_names, media_contribution)
+
+# Barplot
+bar_plot <- ggplot(data = df, aes(x = media_names, y = media_contribution)) +
+  geom_bar(stat = "identity", color = "black",
+           fill = c("darkgreen", "steelblue", "firebrick")) +
+  geom_text(aes(label = media_contribution),
+            vjust = -0.3, size = 3.5) +
+  labs(title = "Contribution to Sales",
+       x = "Media", y = "Contribution") +
+  theme_minimal()
+
+# Change the order of the bars
+bar_plot + scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
+```
+```{r}
+# Total contribution from all media
+allmedia_contribution <- tiktok_contribution + google_ads_contribution + facebook_contribution 
+
+# Percentage contributions
+tiktok_pct       <- tiktok_contribution       / allmedia_contribution
+google_ads_pct  <- google_ads_contribution  / allmedia_contribution
+facebook_pct <- facebook_contribution / allmedia_contribution
+
+
+# Put into a vector
+pct_contribution <- c(tiktok_pct, google_ads_pct, facebook_pct)
+
+# Convert to percentage format
+pct_contribution <- percent(pct_contribution)
+
+# Media names
+media_names <- c("Tiktok","Google Ads", "Facebook")
+
+# Data frame
+df2 <- data.frame(media_names, pct_contribution)
+
+# Barplot for percentage contributions
+bar_plot_pct <- ggplot(data = df2, aes(x = media_names, y = pct_contribution)) +
+  geom_bar(stat = "identity", color = "black",
+           fill = c("darkgreen", "steelblue", "firebrick")) +
+  geom_text(aes(label = pct_contribution),
+            vjust = -0.3, size = 3.5) +
+  labs(title = "Percentage Contribution to Sales",
+       x = "Media", y = "Percentage") +
+  theme_minimal()
+
+# Change the order of the bars
+bar_plot_pct + scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
+
+```
+
+
+```{r}
+
+# Total cost
+cost_total <- tiktok_spend + google_spend + facebook_spend 
+
+# Vector of costs
+cost <- c(tiktok_spend, google_spend, facebook_spend)
+cost <- round(cost, digits = 0)
+
+# Traffic Contribution vs Cost Data Frame
+df3 <- data.frame(
+  sales_cost = rep(c("Sales", "Cost"), each = 3),
+  media_names = rep(c("Tiktok", "Google Ads", "Facebook"), 2),
+  values = c(media_contribution, cost)
+)
+
+```
+
+```{r}
+# Grouped barplot: Sales vs Cost
+bar_plot3 <- ggplot(data = df3, aes(x = media_names, y = values, fill = sales_cost)) +
+  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
+  labs(title = "Sales vs. Media Cost",
+       x = "Media", y = "Sales and Cost") +
+  theme_minimal() +
+  scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
+
+# Display the plot
+bar_plot3
+```
+
+```{r}
+# Calculate the traffic return (TROMI) for each media
+roi_tiktok  <- tiktok_contribution       / tiktok_spend
+roi_google_ads  <- google_ads_contribution  / google_spend
+roi_facebook <- facebook_contribution / facebook_spend
 
 
 
+# Put ROI values into a vector
+roi <- c(roi_tiktok, roi_google_ads, roi_facebook )
 
+# Round ROI values
+roi <- round(roi, digits = 2)
+
+# Create data frame
+media_names <- c("Tiktok", "Google Ads", "Facebook")
+df4 <- data.frame(media_names, roi)
+
+# Preview
+head(df4)
+```
+
+```{r}
+
+# TROMI bar plot
+bar_plot4 <- ggplot(data = df4, aes(x = media_names, y = roi)) +
+  geom_bar(stat = "identity", color = "black",
+           fill = c("darkgreen", "steelblue", "firebrick")) +
+  geom_text(aes(label = roi),
+            vjust = -0.3, size = 3.5) +
+  labs(title = "Sales Return on Marketing Investment (SROMI)",
+       x = "Media", y = "SROMI (Sales per Unit Spend)") +
+  theme_minimal() +
+  scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
+
+# Display plot
+bar_plot4
+```
+
+
+```{r}
+# Calculate spend per channel
+google_spend <- sum(data$google_ads)
+facebook_spend <- sum(data$facebook)
+tiktok_spend <- sum(data$tiktok)
+
+# Combine into a vector
+spend <- c(google_spend, facebook_spend, tiktok_spend)
+channels <- c("Google Ads", "Facebook", "TikTok")
+
+# Create percentages
+pct <- round(spend / sum(spend) * 100)
+
+# Labels with percentages
+labels <- paste0(channels, " (", pct, "%)")
+
+# Plot pie chart
+pie(spend, labels = labels, main = "Marketing Spend Distribution",
+    col = c("steelblue", "firebrick", "darkgreen"))
+
+```
+
+```{r}
+
+# The sum of all media elasticities
+beta_allmedia <- beta_tiktok + beta_google_ads + beta_facebook
+
+# Optimal resource allocation (budget share by elasticity)
+optim_tiktok <- beta_tiktok / beta_allmedia
+optim_facebook <- beta_google_ads / beta_allmedia
+optim_google_ads <- beta_facebook / beta_allmedia
+
+# Pie-chart ingredients for optimal allocation
+slices_optim <- c(optim_tiktok, optim_google_ads, optim_facebook)
+slices_optim <- round(slices_optim, digits = 2)
+
+lbls_optim <- c("Tiktok", "Google Ads", "Facebook")
+pct_optim  <- round(slices_optim * 100)
+
+# Add percentage labels
+lbls_optim <- paste(lbls_optim, pct_optim, "%")
+
+# Pie chart
+pie(slices_optim,
+    labels = lbls_optim,
+    col = rainbow(length(lbls_optim)),
+    main = "Optimal Budget Allocation")
+```
 
 
 
