@@ -7,7 +7,6 @@ output:
 ---
 
 
-
 ```{r include=FALSE}
 
 # install pacman if you don’t have it yet
@@ -67,7 +66,7 @@ str(data)
 order_levels <- c("Sales", "Google Ads", "Facebook", "TikTok")
 
 long <- data %>%
-  select(Date, Sales = sales, `Google Ads` = google_ads,
+  select(Date, `Google Ads` = google_ads,
          Facebook = facebook, TikTok = tiktok) %>%
   pivot_longer(-Date, names_to = "series", values_to = "value") %>%
   mutate(
@@ -78,12 +77,11 @@ ggplot(long, aes(Date, value, color = series)) +
   geom_line(linewidth = 0.9) +
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   scale_color_manual(values = c(
-    "Sales"      = "orange",
     "Google Ads" = "steelblue",
     "Facebook"   = "firebrick",
     "TikTok"     = "darkgreen"
   )) +
-  labs(title = "Weekly Performance by Channel", x = NULL, y = NULL) +
+  labs(title = "Marketing Spending per Channel", x = NULL, y = NULL) +
   scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
   scale_y_continuous(labels = label_dollar(prefix = "$")) +
   theme_minimal(base_size = 12) +
@@ -91,6 +89,25 @@ ggplot(long, aes(Date, value, color = series)) +
         legend.position = "none")
 
 
+
+sales <- data %>%
+  select(Date,Sales = sales ) %>%
+  pivot_longer(-Date, names_to = "series", values_to = "value") %>%
+  mutate(
+    series = factor(series)  # puts Sales first
+  )
+
+ggplot(sales, aes(Date, value, color = series)) +
+  geom_line(linewidth = 0.9) +
+  facet_wrap(~ series, ncol = 1, scales = "free_y")+
+  labs(title = "Sales Performance Over Time", x = NULL, y = NULL) +
+  scale_color_manual(values = 'orange' )+
+  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
+  scale_y_continuous(labels = label_dollar(prefix = "$")) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "none")
+sales 
 ```
 
 
@@ -187,7 +204,8 @@ summary(regression1)
 
 ### Intercept (\(5.533\))  
 - Represents the **baseline log-sales** when all predictors are zero.  
-- Captures inherent sales not explained by marketing or previous sales.  
+- Captures inherent sales not explained by marketing or previous sales.
+- When there is no marketing spend, the expected value of $ln(Sales)$ is **5.533**
 
 ### Lagged Sales (\(0.357\))  
 - A **1% increase in last period’s sales** increases current sales by about **0.36%**, holding other factors constant.  
@@ -219,7 +237,7 @@ lines(fitted_sales, col = "red", lwd = 2)
 
 legend("bottomright",
        lty = 1, col = c("blue", "red"),
-       legend = c("Logged Traffic Data", "Fitted"),
+       legend = c("Logged Sales Data", "Fitted"),
        cex = 0.75)
 ```
 
@@ -365,13 +383,7 @@ roi_facebook <- facebook_contribution / facebook_spend
 
 
 # Put ROI values into a vector
-roi <- c(roi_tiktok, roi_google_ads, roi_facebook )
-
-# Round ROI values and convert to percentage
-roi <- round(roi * 100, 1)
-
-# Add percent symbol
-roi <- paste0(roi, "%")
+roi <- round(c(roi_tiktok, roi_google_ads, roi_facebook ),2)
 
 # Create data frame
 media_names <- c("Tiktok", "Google Ads", "Facebook")
@@ -405,15 +417,16 @@ bar_plot4
 ```
 Based on the estimation results, the **Sales Return on Marketing Investment (SROMI)** values are:  
 
-- TikTok: **13.2%**  
-- Facebook: **24.7%**  
-- Google Ads: **23.5%**  
+- TikTok: **0.13**  
+- Facebook: **0.15**  
+- Google Ads: **0.23**  
 
 **Google Ads yields the highest ROI** among the three channels. 
 
 Although the **beta coefficient of TikTok (0.037)** is slightly higher than that of **Google Ads (0.033)**, the **ROI of Google Ads is greater**.  
 This happens because ROI reflects not only the responsiveness of sales to ad spend (elasticity) but also the **sales-to-cost ratio**.  
-In other words, Google Ads delivers more sales per unit of cost, making it the most efficient channel despite TikTok’s higher elasticity.  
+In other words, Google Ads delivers more sales per unit of cost, making it the most efficient channel despite TikTok’s higher elasticity.
+However, all of the channels generate loss for every additional dollar spent.
 
  
  
@@ -536,8 +549,11 @@ regression2 <- lm(
     ln_facebook:ln_tiktok
 )
 
+# Extended regression with interaction terms
+
 # Summary of results
 summary(regression2)
+
 ```
 
 
