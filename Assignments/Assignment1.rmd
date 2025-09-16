@@ -111,7 +111,7 @@ sales
 ```
 
 
-```{r include=FALSE}
+```{r echo=FALSE}
 google_ads <- data$google_ads
 facebook <- data$facebook
 tiktok <- data$tiktok
@@ -178,7 +178,7 @@ where:
 ---
 
 
-```{r}
+```{r echo=FALSE}
 # Fit the Regression
 
 regression1 <- lm(
@@ -241,7 +241,7 @@ legend("bottomright",
        cex = 0.75)
 ```
 
-```{r include=FALSE}
+```{r echo=FALSE}
 #retrieve model coefficients 
 
 beta_google_ads <- summary(regression1)$coefficients[3,1] #row three column one 
@@ -343,7 +343,7 @@ bar_plot_pct + scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
 ```
 
 
-```{r include=FALSE}
+```{r echo=FALSE}
 
 # Total cost
 cost_total <- tiktok_spend + google_spend + facebook_spend 
@@ -374,7 +374,7 @@ bar_plot3 <- ggplot(data = df3, aes(x = media_names, y = values, fill = sales_co
 bar_plot3
 ```
 
-```{r include=FALSE}
+```{r echo=FALSE}
 # Calculate the traffic return (TROMI) for each media
 roi_tiktok  <- tiktok_contribution       / tiktok_spend
 roi_google_ads  <- google_ads_contribution  / google_spend
@@ -390,7 +390,7 @@ media_names <- c("Tiktok", "Google Ads", "Facebook")
 df4 <- data.frame(media_names, roi)
 
 # Preview
-head(df4)
+#Shead(df4)
 ```
 
 # Question 2 (2 points)
@@ -487,7 +487,6 @@ pie(spend, labels = labels, main = "Marketing Spend Distribution",
     col = c("steelblue", "firebrick", "darkgreen"))
 
 ```
-
 ```{r echo=FALSE}
 
 # The sum of all media elasticities
@@ -539,7 +538,7 @@ $$
 
 
 
-```{r echo=TRUE}
+```{r echo=FALSE}
 
 # Extended regression with interaction terms
 regression2 <- lm(
