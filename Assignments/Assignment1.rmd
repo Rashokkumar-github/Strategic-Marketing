@@ -71,8 +71,8 @@ theme_set(theme_mm)
 
 ```{r include=FALSE}
 # Read data
-stopifnot(file.exists("/Users/andrejr/Documents/Universiteit/MSc Data Science & Marketing Analytics/Strategic Marketing Decision Making/Group assignment 1/marketing_mix_assignment.csv"))
-data <- readr::read_csv("/Users/andrejr/Documents/Universiteit/MSc Data Science & Marketing Analytics/Strategic Marketing Decision Making/Group assignment 1/marketing_mix_assignment.csv", show_col_types = FALSE)
+stopifnot(file.exists("marketing_mix_assignment.csv"))
+data <- readr::read_csv("marketing_mix_assignment.csv", show_col_types = FALSE)
 
 # Standardize names
 data <- data %>%
