@@ -27,7 +27,6 @@ header-includes:
   - \titleformat{\subsection}{\sffamily\bfseries\large}{\thesubsection}{1em}{}
 ---
 
-
 ```{r include=FALSE}
 # install pacman if you don’t have it yet
 if (!require("pacman")) install.packages("pacman")
@@ -72,8 +71,8 @@ theme_set(theme_mm)
 
 ```{r include=FALSE}
 # Read data
-stopifnot(file.exists("marketing_mix_assignment.csv"))
-data <- readr::read_csv("marketing_mix_assignment.csv", show_col_types = FALSE)
+stopifnot(file.exists("/Users/andrejr/Documents/Universiteit/MSc Data Science & Marketing Analytics/Strategic Marketing Decision Making/Group assignment 1/marketing_mix_assignment.csv"))
+data <- readr::read_csv("/Users/andrejr/Documents/Universiteit/MSc Data Science & Marketing Analytics/Strategic Marketing Decision Making/Group assignment 1/marketing_mix_assignment.csv", show_col_types = FALSE)
 
 # Standardize names
 data <- data %>%
@@ -102,6 +101,7 @@ tibble::tibble(
   kable_styling(full_width = FALSE, position = "center")
 
 ```
+
 ```{r}
 # Desired facet order (top → bottom)
 order_levels <- c("Sales", "Google Ads", "Facebook", "TikTok")
@@ -133,32 +133,33 @@ ggplot(long, aes(Date, value, color = series)) +
 
 ```
 
-# Quesiton 1 (2 points)
-Estimate a marketing mix model that incorporates carry-over effects and diminishing returns of marketing mix. Present the final model output and interpret all estimated coefficients.
+# Question 1 (2 points)
 
-## Marketing Mix Model with Carry-Over Effects and Diminishing Returns  
+*Estimate a marketing mix model that incorporates carry-over effects and diminishing returns of marketing mix. Present the final model output and interpret all estimated coefficients.*
 
-To understand the impact of different marketing channels on sales, we estimated a **log-log regression model**. Using logarithms allows us to capture **diminishing returns** — meaning that as ad spend increases, the incremental effect on sales decreases.  
+## Marketing Mix Model with Carry-Over Effects and Diminishing Returns
 
-We also incorporated a **carry-over effect** by including **lagged sales** (\(\ln(Sales_{t-1})\)) as a predictor. This term accounts for the fact that sales performance in one period tends to influence sales in the next period, capturing **brand momentum, customer loyalty, and word-of-mouth effects**.  
+To understand the impact of different marketing channels on sales, we estimated a **log-log regression model**. Using logarithms allows us to capture **diminishing returns** — meaning that as ad spend increases, the incremental effect on sales decreases.
 
-## General Model Specification  
+We also incorporated a **carry-over effect** by including **lagged sales** ($\ln(Sales_{t-1})$) as a predictor. This term accounts for the fact that sales performance in one period tends to influence sales in the next period, capturing **brand momentum, customer loyalty, and word-of-mouth effects**.
 
-\[
+## General Model Specification
+
+$$
 \ln(Sales_t) \;=\; \beta_0 
 + \beta_1 \cdot \ln(Sales_{t-1})
 + \beta_2 \cdot \ln(GoogleAds_t)
 + \beta_3 \cdot \ln(Facebook_t)
 + \beta_4 \cdot \ln(TikTok_t)
 + \varepsilon_t
-\]
+$$
 
-where:  
+where:
 
-- \(\beta_0\) = intercept (baseline sales level)  
-- \(\beta_1\) = carry-over effect of lagged sales  
-- \(\beta_2, \beta_3, \beta_4\) = elasticities of sales with respect to Google Ads, Facebook Ads, and TikTok Ads spend  
-- \(\varepsilon_t\) = error term  
+-   $\beta_0$ = intercept (baseline sales level)\
+-   $\beta_1$ = carry-over effect of lagged sales\
+-   $\beta_2, \beta_3, \beta_4$ = elasticities of sales with respect to Google Ads, Facebook Ads, and TikTok Ads spend\
+-   $\varepsilon_t$ = error term
 
 ```{r}
 # Build time series + log transforms
@@ -215,29 +216,29 @@ reg1_tidy %>%
 
 
 ```
-## Estimated Model  
 
-\[
+## Estimated Model
+
+$$
 \ln(Sales_t) \;=\; 5.533 
 + 0.357 \cdot \ln(Sales_{t-1})
 + 0.033 \cdot \ln(GoogleAds_t)
 + 0.030 \cdot \ln(Facebook_t)
 + 0.037 \cdot \ln(TikTok_t)
 + \varepsilon_t
-\]
+$$
 
-### Interpretation of Coefficients  
-
+### Interpretation of Coefficients
 
 The **Intercept** represents the **baseline log-sales** when all predictors are zero. Captures inherent sales not explained by marketing or previous sales. When there is no marketing spend, the expected value of $ln(Sales)$ is **5.533**
 
-A **1% increase in last period’s sales** increases current sales by **0.357%**, holding other factors constant. Reflects **carry-over effects**: sales momentum persists over time.  
+A **1% increase in last period’s sales** increases current sales by **0.357%**, holding other factors constant. Reflects **carry-over effects**: sales momentum persists over time.
 
-A **1% increase in Google Ads spend** increases sales by **0.033%**.Since the model is log-log, this implies **diminishing returns**. Likely **highly significant** (\(p < 0.001\)).  
+A **1% increase in Google Ads spend** increases sales by **0.033%**.Since the model is log-log, this implies **diminishing returns**. Likely **highly significant** ($p < 0.001$).
 
-A **1% increase in Facebook spend** increases sales by **0.030%**.Also subject to **diminishing returns**.  
+A **1% increase in Facebook spend** increases sales by **0.030%**.Also subject to **diminishing returns**.
 
-A **1% increase in TikTok spend** increases sales by **0.037%**. Among the three channels, TikTok shows the **largest elasticity**, suggesting it has a greater effect on $ln(Sales)$ than Facebook and Google Ads.  
+A **1% increase in TikTok spend** increases sales by **0.037%**. Among the three channels, TikTok shows the **largest elasticity**, suggesting it has a greater effect on $ln(Sales)$ than Facebook and Google Ads.
 
 ```{r include=FALSE}
 fitted_vals <- fitted(regression1)
@@ -258,15 +259,15 @@ tibble(
 
 # Question 2 (2 points)
 
-Report the ROI of each marketing channel based on the estimation output in Question 1. Which marketing channel yields the highest ROI?
+*Report the ROI of each marketing channel based on the estimation output in Question 1. Which marketing channel yields the highest ROI?*
 
 ## Sales Return on Marketing Investment (SROMI) values are:
-- **TikTok:** 0.13  
-- **Facebook:** 0.15  
-- **Google Ads:** 0.23  
 
+-   **TikTok:** 0.13\
+-   **Facebook:** 0.15\
+-   **Google Ads:** 0.23
 
-Among the three channels, **Google Ads yields the highest ROI (0.23)**, meaning it generates the most incremental sales per unit of spend. Although the **beta coefficient of TikTok (0.037)** is slightly higher than that of **Google Ads (0.033)**, the **ROI of Google Ads is greater**. This happens because ROI reflects not only the responsiveness of sales to ad spend (elasticity) but also the **sales-to-cost ratio**. In other words, Google Ads delivers more sales per unit of cost, making it the most efficient channel despite TikTok’s higher elasticity. However, all of the channels generate loss for every additional dollar spent. In other words, incremental sales returns are belwo the break-even.
+Among the three channels, **Google Ads yields the highest ROI (0.23)**, meaning it generates the most incremental sales per unit of spend. Although the **beta coefficient of TikTok (0.037)** is slightly higher than that of **Google Ads (0.033)**, the **ROI of Google Ads is greater**. This happens because ROI reflects not only the responsiveness of sales to ad spend (elasticity) but also the **sales-to-cost ratio**. In other words, Google Ads delivers more sales per unit of cost, making it the most efficient channel despite TikTok’s higher elasticity. However, all of the channels generate loss for every additional dollar spent. In other words, incremental sales returns are below the break-even.
 
 ```{r include=FALSE}
 # Pull betas
@@ -329,9 +330,9 @@ roi_df %>%
 
 ```
 
+# Question 3 (1 point)
 
-# Quesiton 3 (1 point)
-Is the model-recommended optimal budget allocation different from the actual allocation? How do you suggest FourTex should reallocate its budget across TikTok, Facebook, and Google to maximize sales? Support your answers with relevant figures.
+*Is the model-recommended optimal budget allocation different from the actual allocation? How do you suggest FourTex should reallocate its budget across TikTok, Facebook, and Google to maximize sales? Support your answers with relevant figures.*
 
 ```{r}
 # Actual spend distribution
@@ -362,6 +363,7 @@ bind_rows(
 
 
 ```
+
 ```{r}
 plot_df <- bind_rows(actual_spend, opt_share) %>%
   mutate(
@@ -386,25 +388,27 @@ ggplot(plot_df, aes(x = Channel, y = Share, fill = Type)) +
 
 ```
 
+## Recommendation
 
-## Recommendation  
+The model suggests **reducing TikTok’s share** of the budget (from 44% → 36%) and **increasing Google Ads’ share** (from 23% → 30%), and **reducing Facebook's share** (from 33% → 30%). This adjustment reflects the fact that although TikTok has the highest elasticity (beta), **Google Ads delivers the highest ROI due to its better sales-to-cost ratio**. By reallocating funds accordingly, FourTex can **maximize overall sales efficiency**, generating more incremental sales for the same total budget. This reallocation balances responsiveness (TikTok’s elasticity) with efficiency (Google Ads’ ROI), leading to a more optimal marketing mix.
 
-The model suggests **reducing TikTok’s share** of the budget (from 44% → 36%) and **increasing Google Ads’ share** (from 23% → 30%), and **reducing Facebook's share** (from 33% →  30%). This adjustment reflects the fact that although TikTok has the highest elasticity (beta), **Google Ads delivers the highest ROI due to its better sales-to-cost ratio**. By reallocating funds accordingly, FourTex can **maximize overall sales efficiency**, generating more incremental sales for the same total budget. This reallocation balances responsiveness (TikTok’s elasticity) with efficiency (Google Ads’ ROI), leading to a more optimal marketing mix.  
+# Question 4 (3 points)
 
-
-# Quesiton 4 (3 points)
-Do different marketing channel pairs have synergistic or antagonistic effects? For each pair of channels (e.g., Facebook–TikTok, Facebook–Google Ads, TikTok–Google Ads), interpret the model results and explain the rationale. Your interpretation should explicitly consider the nature and role of each channel (e.g., TikTok’s reach and virality, Facebook’s targeting, Ad’s awareness-building) rather than giving a generic answer. Support your explanation with relevant model output(s).
+*Do different marketing channel pairs have synergistic or antagonistic effects? For each pair of channels (e.g., Facebook–TikTok, Facebook–Google Ads, TikTok–Google Ads), interpret the model results and explain the rationale. Your interpretation should explicitly consider the nature and role of each channel (e.g., TikTok’s reach and virality, Facebook’s targeting, Ad’s awareness-building) rather than giving a generic answer. Support your explanation with relevant model output(s).*
 
 ### TikTok
-The nature of the short-form video platform comes with massive **reach and virality**, especially among the younger demographic. The platform primarily serves as a **top-of-funnel** marketing channel where is utlised correctly can serve as an engine to build **brand awareness**, **cultural relevance**, and **emotional investment** with the audience. The strength of the platform is its ability to create quick spikes in visibility and influence purchase intent indirectly. Conversion tends to be indirect, ROI may often look low if measured only on immediate sales.
+
+The nature of the short-form video platform comes with massive **reach and virality**, especially among the younger demographic. The platform primarily serves as a **top-of-funnel** marketing channel, where it is utilised correctly, it can serve as an engine to build **brand awareness**, **cultural relevance**, and **emotional investment** with the audience. The strength of the platform is its ability to create quick spikes in visibility and influence purchase intent indirectly. Conversion tends to be indirect, ROI may often look low if measured only on immediate sales.
 
 ### Facebook (Meta Ads)
-A mature social advertising platform with advanced **targeting and retargeting** capabilities. The strength of Meta Ads is in **mid-funnel** activities, engaging users who already have some awareness and nudging them toward consideration or repeat purchase. Simultaneously enhanced by highly customisable audience segmentation, effective for retargeting website visitors or lookalike audiences.
+
+A mature social advertising platform with advanced **targeting and re-targeting** capabilities. The strength of Meta Ads is in **mid-funnel** activities, engaging users who already have some awareness and nudging them toward consideration or repeat purchase. Simultaneously enhanced by highly customizable audience segmentation, effective for re-targeting website visitors or lookalike audiences.
 
 ### Google Ads
+
 A search and display based advertising platform capturing **active intent**. Primarily **bottom-funnel** best at converting users who are already looking for a product or solution. **High conversion rates** because it targets people with purchase intent, ROI is usually stronger in short-term sales attribution. However, out of the three marketing channels, Google Ads historically is the most expensive per click
 
-## General Model Specification  
+## General Model Specification
 
 \begin{align}
 \ln(Sales_t) \;=\;& \; \beta_0
@@ -448,57 +452,50 @@ reg2_tidy %>%
 
 ```
 
-
 ## Channel Pair Interpretations
 
-### 1. Facebook × TikTok  
-- **Hypothesis:**  
-  TikTok provides **reach and virality** (top-of-funnel), while Facebook specializes in **targeting & retargeting** (mid-funnel). This suggests potential **synergy**, where TikTok builds awareness and Facebook converts those customers by through customer segmentation and targeted ads.  
+### 1. Facebook × TikTok
 
-- **Model result:**  
-  Coefficient = –0.0006, p = 0.156 
+-   **Hypothesis:**\
+    TikTok provides **reach and virality** (top-of-funnel), while Facebook specializes in **targeting & re-targeting** (mid-funnel). This suggests potential **synergy**, where TikTok builds awareness and Facebook converts those customers by through customer segmentation and targeted ads.
 
-- **Interpretation:**  
-  The effect is essentially **neutral** as the coefficient is negligible and not significant . Despite out hypothesis complementarity, TikTok’s awareness traffic does not significantly boost Facebook’s targeting effectiveness. The two platforms appear to operate **independently**.  
+-   **Model result:**\
+    Coefficient = –0.0006, p = 0.156
 
+-   **Interpretation:**\
+    The effect is essentially **neutral** as the coefficient is negligible and not significant . Despite out hypothesis complementarity, TikTok’s awareness traffic does not significantly boost Facebook’s targeting effectiveness. The two platforms appear to operate **independently**.
 
-### 2. Google Ads × Facebook  
-- **Hypothesis (theory):**  
-  Facebook nurtures buyers with content and engagement, while Google Ads captures **intent-driven searches** (bottom-funnel). This could produce **synergy**, where Facebook primes customers and Google closes the sale.  
+### 2. Google Ads × Facebook
 
-- **Model result:**  
-  Coefficient = –0.0012, p = 0.026
+-   **Hypothesis (theory):**\
+    Facebook nurtures buyers with content and engagement, while Google Ads captures **intent-driven searches** (bottom-funnel). This could produce **synergy**, where Facebook primes customers and Google closes the sale.
 
-- **Interpretation:**  
-  The channels show **antagonism** as the coefficient is negative and significant. Their overlapping audiences reduce incremental effectiveness. Customers exposed to Facebook may later convert through Google Ads, leading to **cannibalization** rather than reinforcement. Which indicates that the marketing channels end up influencing or converting the same customer. Instead of adding new sakes they compete for credit for the same purchase.
+-   **Model result:**\
+    Coefficient = –0.0012, p = 0.026
 
+-   **Interpretation:**\
+    The channels show **antagonism** as the coefficient is negative and significant. Their overlapping audiences reduce incremental effectiveness. Customers exposed to Facebook may later convert through Google Ads, leading to **cannibalization** rather than reinforcement. Which indicates that the marketing channels end up influencing or converting the same customer. Instead of adding new sakes they compete for credit for the same purchase.
 
+### 3. Google Ads × TikTok
 
-### 3. Google Ads × TikTok  
-- **Hypothesis (theory):**  
-  TikTok creates mass **awareness & reach**, while Google captures high-intent searches. If distinct, this could generate **synergy**.  
+-   **Hypothesis (theory):**\
+    TikTok creates mass **awareness & reach**, while Google captures high-intent searches. If distinct, this could generate **synergy**.
 
-- **Model result:**  
-  Coefficient = –0.0013, p = 0.015  
+-   **Model result:**\
+    Coefficient = –0.0013, p = 0.015
 
-- **Interpretation:**  
-  Evidence of **antagonism** as the coefficient is negative and significant. TikTok-influenced customers often still rely on Google searches before purchase, so Google “captures” the same users. The two channels cannibalize each other’s contributions rather than complementing.  
+-   **Interpretation:**\
+    Evidence of **antagonism** as the coefficient is negative and significant. TikTok-influenced customers often still rely on Google searches before purchase, so Google “captures” the same users. The two channels cannibalize each other’s contributions rather than complementing.
 
+## Summary of Channel Interactions
 
-## Summary of Channel Interactions  
+| Channel Pair          | Hypothesized Effect | Model Result | Conclusion          |
+|-------------------|------------------|------------------|------------------|
+| Facebook × TikTok     | Synergy             | Neutral      | **No synergy**      |
+| Google Ads × Facebook | Synergy             | Antagonism   | **Cannibalization** |
+| Google Ads × TikTok   | Synergy             | Antagonism   | **Cannibalization** |
 
-| Channel Pair         | Hypothesized Effect | Model Result | Conclusion      |
-|----------------------|---------------------|--------------|-----------------|
-| Facebook × TikTok    | Synergy             | Neutral      | **No synergy** |
-| Google Ads × Facebook| Synergy             | Antagonism   | **Cannibalization** |
-| Google Ads × TikTok  | Synergy             | Antagonism   | **Cannibalization** |
-
-**Overall Insight:**  
-- No synergies were detected in the data.  
-- Significant **antagonism** occurs when Google Ads runs in parallel with either TikTok or Facebook.  
+**Overall Insight:**\
+- No synergies were detected in the data.\
+- Significant **antagonism** occurs when Google Ads runs in parallel with either TikTok or Facebook.\
 - **Facebook–TikTok** appears neutral, so they can be combined without major loss of efficiency.
-
-
-
-
-
