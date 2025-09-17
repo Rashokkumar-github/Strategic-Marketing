@@ -499,3 +499,13 @@ reg2_tidy %>%
 - No synergies were detected in the data.\
 - Significant **antagonism** occurs when Google Ads runs in parallel with either TikTok or Facebook.\
 - **Facebook–TikTok** appears neutral, so they can be combined without major loss of efficiency.
+
+# Appendix
+
+```{r, echo=FALSE, results='asis'}
+# Extract the R code from the current Rmd
+code_file <- knitr::purl("Assignment1.rmd", quiet = TRUE)
+cat("```r\n")
+cat(readLines(code_file), sep = "\n")
+cat("\n```")
+```
