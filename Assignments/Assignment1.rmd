@@ -1,14 +1,33 @@
---- 
-
-title: "Marketing Mix Modelling (MMM)" 
-subtitle: "Group Assignment 1" 
-output: 
+---
+title: "Marketing Mix Modelling (MMM)"
+subtitle: "Group Assignment 1"
+author:
+  - "Rishi Ashok Kumar (560527)"
+  - "Nicolas Gonzalez (780037)"
+  - "Aleksandra Tatko (648925)"
+  - "André van der Meij (589994)"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
   pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    fig_caption: true
+    latex_engine: pdflatex
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+  - \usepackage[T1]{fontenc}
+  - \usepackage[scaled]{helvet}
+  - \renewcommand{\familydefault}{\sfdefault}
+  - \usepackage{booktabs}
+  - \usepackage{amsmath}
+  - \usepackage{titlesec}
+  - \titleformat{\section}{\sffamily\bfseries\Large}{\thesection}{1em}{}
+  - \titleformat{\subsection}{\sffamily\bfseries\large}{\thesubsection}{1em}{}
 ---
 
-
 ```{r include=FALSE}
-
 # install pacman if you don’t have it yet
 if (!require("pacman")) install.packages("pacman")
 
@@ -18,55 +37,77 @@ pacman::p_load(
   scales,
   ggplot2,
   dplyr,
-  tinytex
+  tinytex,
+  kableExtra,
+  broom
 )
+
+# Global knitr options for clean output
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 7,     # ~ full text width
+  fig.height = 4.2,  # comfortable aspect
+  out.width = "92%"
+)
+
+# A consistent, readable ggplot theme
+theme_mm <- theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(margin = margin(b = 8)),
+    plot.caption = element_text(size = 9, color = "grey30"),
+    axis.title.y = element_text(margin = margin(r = 6)),
+    axis.title.x = element_text(margin = margin(t = 6)),
+    panel.grid.minor = element_blank(),
+    legend.position = "none",
+    strip.text = element_text(face = "bold")
+  )
+theme_set(theme_mm)
 
 ```
 
 ```{r include=FALSE}
-
 # Read data
 stopifnot(file.exists("marketing_mix_assignment.csv"))
 data <- readr::read_csv("marketing_mix_assignment.csv", show_col_types = FALSE)
-```
 
-
-```{r include=FALSE}
-
+# Standardize names
 data <- data %>%
   rename(
     google_ads = `Google Ads`,
     facebook   = Facebook,
     tiktok     = TikTok,
     sales      = Sales
-  ) 
+  )
 
-# "09/10/2025"  (mm/dd/yyyy)
-data$Date <- as.Date(data$Date, format = "%m/%d/%Y")
+# Parse Date ("mm/dd/yyyy" like "09/10/2025")
+data <- data %>% mutate(Date = as.Date(Date, format = "%m/%d/%Y"))
 
+# Quick quality checks
+missing_counts <- colSums(is.na(dplyr::select(data, google_ads, facebook, tiktok, sales)))
+neg_counts <- sapply(dplyr::select(data, google_ads, facebook, tiktok, sales), function(x) sum(x < 0, na.rm = TRUE))
 
-# check for missing data
-colSums(is.na(select(data, google_ads, facebook, tiktok, sales)))
-
-# Negative-value counts per column
-sapply(select(data, google_ads, facebook, tiktok, sales), function(x) sum(x < 0, na.rm = TRUE))
-
-str(data)
+tibble::tibble(
+  Metric = c("Missing values", "Negative values"),
+  Google_Ads = c(missing_counts[["google_ads"]], neg_counts[["google_ads"]]),
+  Facebook   = c(missing_counts[["facebook"]],   neg_counts[["facebook"]]),
+  TikTok     = c(missing_counts[["tiktok"]],     neg_counts[["tiktok"]]),
+  Sales      = c(missing_counts[["sales"]],      neg_counts[["sales"]])
+) |>
+  kable(caption = "Data Quality Checks") |>
+  kable_styling(full_width = FALSE, position = "center")
 
 ```
 
-
-
-
-
-
-```{r include=FALSE}
-
+```{r}
 # Desired facet order (top → bottom)
 order_levels <- c("Sales", "Google Ads", "Facebook", "TikTok")
 
 long <- data %>%
-  select(Date, `Google Ads` = google_ads,
+  select(Date, Sales = sales, `Google Ads` = google_ads,
          Facebook = facebook, TikTok = tiktok) %>%
   pivot_longer(-Date, names_to = "series", values_to = "value") %>%
   mutate(
@@ -77,11 +118,12 @@ ggplot(long, aes(Date, value, color = series)) +
   geom_line(linewidth = 0.9) +
   facet_wrap(~ series, ncol = 1, scales = "free_y") +
   scale_color_manual(values = c(
+    "Sales"      = "orange",
     "Google Ads" = "steelblue",
     "Facebook"   = "firebrick",
     "TikTok"     = "darkgreen"
   )) +
-  labs(title = "Marketing Spending per Channel", x = NULL, y = NULL) +
+  labs(title = "Sales and Weekly Marketing Spend by Media", x = NULL, y = NULL) +
   scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
   scale_y_continuous(labels = label_dollar(prefix = "$")) +
   theme_minimal(base_size = 12) +
@@ -89,533 +131,381 @@ ggplot(long, aes(Date, value, color = series)) +
         legend.position = "none")
 
 
-
-sales <- data %>%
-  select(Date,Sales = sales ) %>%
-  pivot_longer(-Date, names_to = "series", values_to = "value") %>%
-  mutate(
-    series = factor(series)  # puts Sales first
-  )
-
-ggplot(sales, aes(Date, value, color = series)) +
-  geom_line(linewidth = 0.9) +
-  facet_wrap(~ series, ncol = 1, scales = "free_y")+
-  labs(title = "Sales Performance Over Time", x = NULL, y = NULL) +
-  scale_color_manual(values = 'orange' )+
-  scale_x_date(date_breaks = "6 months", date_labels = "%b %Y") +
-  scale_y_continuous(labels = label_dollar(prefix = "$")) +
-  theme_minimal(base_size = 12) +
-  theme(panel.grid.minor = element_blank(),
-        legend.position = "none")
-sales 
 ```
 
+# Question 1 (2 points)
 
-```{r echo=FALSE}
-google_ads <- data$google_ads
-facebook <- data$facebook
-tiktok <- data$tiktok
-sales <- data$sales
+*Estimate a marketing mix model that incorporates carry-over effects and diminishing returns of marketing mix. Present the final model output and interpret all estimated coefficients.*
 
-freq <- 200
-start_ts <- c(2018, 1)
+## Marketing Mix Model with Carry-Over Effects and Diminishing Returns
 
-google_ads <- ts(google_ads, frequency = freq, start = start_ts)
-facebook   <- ts(facebook,   frequency = freq, start = start_ts)
-tiktok     <- ts(tiktok,     frequency = freq, start = start_ts)
-sales      <- ts(sales,      frequency = freq, start = start_ts)
+To understand the impact of different marketing channels on sales, we estimated a **log-log regression model**. Using logarithms allows us to capture **diminishing returns** — meaning that as ad spend increases, the incremental effect on sales decreases.
 
-# Log transforms (already started these)
-ln_google_ads <- log(google_ads + 1)
-ln_facebook   <- log(facebook   + 1)
-ln_tiktok     <- log(tiktok     + 1)
-ln_sales      <- log(sales      + 1)
+We also incorporated a **carry-over effect** by including **lagged sales** ($\ln(Sales_{t-1})$) as a predictor. This term accounts for the fact that sales performance in one period tends to influence sales in the next period, capturing **brand momentum, customer loyalty, and word-of-mouth effects**.
 
+## General Model Specification
 
-# Creating Lagged Sales Variable
-m <- 1  # one lag
-
-# number of observations
-n <- length(sales)
-
-# Build lagged variable
-Lag1_ln_sales <- c(rep(NA, m), ln_sales[1:(n - m)])
-
-```
-
-
-# Quesiton 1 (2 points)
-Estimate a marketing mix model that incorporates carry-over effects and diminishing returns of marketing
-mix. Present the final model output and interpret all estimated coefficients.
-
-# Marketing Mix Model with Carry-Over Effects and Diminishing Returns  
-
-To understand the impact of different marketing channels on sales, we estimated a **log-log regression model**.  
-Using logarithms allows us to capture **diminishing returns** — meaning that as ad spend increases, the incremental effect on sales decreases.  
-
-We also incorporated a **carry-over effect** by including **lagged sales** (\(\ln(Sales_{t-1})\)) as a predictor.  
-This term accounts for the fact that sales performance in one period tends to influence sales in the next period,  
-capturing **brand momentum, customer loyalty, and word-of-mouth effects**.  
-
-## General Model Specification  
-
-\[
+$$
 \ln(Sales_t) \;=\; \beta_0 
 + \beta_1 \cdot \ln(Sales_{t-1})
 + \beta_2 \cdot \ln(GoogleAds_t)
 + \beta_3 \cdot \ln(Facebook_t)
 + \beta_4 \cdot \ln(TikTok_t)
 + \varepsilon_t
-\]
+$$
 
-where:  
+where:
 
-- \(\beta_0\) = intercept (baseline sales level)  
-- \(\beta_1\) = carry-over effect of lagged sales  
-- \(\beta_2, \beta_3, \beta_4\) = elasticities of sales with respect to Google Ads, Facebook Ads, and TikTok Ads spend  
-- \(\varepsilon_t\) = error term  
+-   $\beta_0$ = intercept (baseline sales level)\
+-   $\beta_1$ = carry-over effect of lagged sales\
+-   $\beta_2, \beta_3, \beta_4$ = elasticities of sales with respect to Google Ads, Facebook Ads, and TikTok Ads spend\
+-   $\varepsilon_t$ = error term
 
----
+```{r}
+# Build time series + log transforms
+google_ads <- data$google_ads
+facebook   <- data$facebook
+tiktok     <- data$tiktok
+sales      <- data$sales
 
+ln_google_ads <- log(google_ads + 1)
+ln_facebook   <- log(facebook   + 1)
+ln_tiktok     <- log(tiktok     + 1)
+ln_sales      <- log(sales      + 1)
 
-```{r echo=FALSE}
-# Fit the Regression
+# One-period lag of ln(Sales)
+Lag1_ln_sales <- dplyr::lag(ln_sales, 1)
 
+# Drop first row with NA lag
+model_df <- tibble(
+  ln_sales = ln_sales,
+  Lag1_ln_sales,
+  ln_google_ads,
+  ln_facebook,
+  ln_tiktok
+) %>% drop_na()
+
+# Fit model
 regression1 <- lm(
-  ln_sales ~ Lag1_ln_sales + ln_google_ads + ln_facebook + ln_tiktok
+  ln_sales ~ Lag1_ln_sales + ln_google_ads + ln_facebook + ln_tiktok,
+  data = model_df
 )
 
-# Show regression summary
-summary(regression1)
-```
-## Estimated Model  
+# Tidy summary table
+reg1_tidy <- broom::tidy(regression1, conf.int = TRUE) %>%
+  mutate(term = recode(term,
+    "(Intercept)"   = "Intercept",
+    "Lag1_ln_sales" = "Lagged ln(Sales)",
+    "ln_google_ads" = "ln(Google Ads)",
+    "ln_facebook"   = "ln(Facebook)",
+    "ln_tiktok"     = "ln(TikTok)"
+  ))
 
-\[
-\ln(Sales_t) \;=\; 5.53 
-+ 0.36853 \cdot \ln(Sales_{t-1})
-+ 0.033472 \cdot \ln(GoogleAds_t)
-+ 0.030489 \cdot \ln(Facebook_t)
-+ 0.036573 \cdot \ln(TikTok_t)
+reg1_glance <- broom::glance(regression1)
+
+reg1_tidy %>%
+  mutate(
+    estimate = round(estimate, 3),
+    conf.low = round(conf.low, 3),
+    conf.high= round(conf.high, 3),
+    p.value  = scales::pvalue(p.value)
+  ) %>%
+  select(Term = term, Estimate = estimate, `95% CI Low` = conf.low, `95% CI High` = conf.high, `p-value` = p.value) %>%
+  kable(caption = "Model 1: Log–Log Regression with Carry-Over") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+
+```
+
+## Estimated Model
+
+$$
+\ln(Sales_t) \;=\; 5.533 
++ 0.357 \cdot \ln(Sales_{t-1})
++ 0.033 \cdot \ln(GoogleAds_t)
++ 0.030 \cdot \ln(Facebook_t)
++ 0.037 \cdot \ln(TikTok_t)
 + \varepsilon_t
-\]
+$$
 
+### Interpretation of Coefficients
 
-## Interpretation of Coefficients  
+The **Intercept** represents the **baseline log-sales** when all predictors are zero. Captures inherent sales not explained by marketing or previous sales. When there is no marketing spend, the expected value of $ln(Sales)$ is **5.533**
 
-### Intercept (\(5.533\))  
-- Represents the **baseline log-sales** when all predictors are zero.  
-- Captures inherent sales not explained by marketing or previous sales.
-- When there is no marketing spend, the expected value of $ln(Sales)$ is **5.533**
+A **1% increase in last period’s sales** increases current sales by **0.357%**, holding other factors constant. Reflects **carry-over effects**: sales momentum persists over time.
 
-### Lagged Sales (\(0.357\))  
-- A **1% increase in last period’s sales** increases current sales by about **0.36%**, holding other factors constant.  
-- Reflects **carry-over effects**: sales momentum persists over time.  
+A **1% increase in Google Ads spend** increases sales by **0.033%**.Since the model is log-log, this implies **diminishing returns**. Likely **highly significant** ($p < 0.001$).
 
-### Google Ads (\(0.033\))  
-- A **1% increase in Google Ads spend** increases sales by **0.033%**.  
-- Since the model is log-log, this implies **diminishing returns** (doubling spend does not double sales).  
-- Likely **highly significant** (\(p < 0.001\)).  
+A **1% increase in Facebook spend** increases sales by **0.030%**.Also subject to **diminishing returns**.
 
-### Facebook Ads (\(0.030\))  
-- A **1% increase in Facebook spend** increases sales by **0.030%**.  
-- Also subject to **diminishing returns**.  
-
-### TikTok Ads (\(0.037\))  
-- A **1% increase in TikTok spend** increases sales by **0.037%**.  
-- Among the three channels, TikTok shows the **largest elasticity**, suggesting higher efficiency.  
-
+A **1% increase in TikTok spend** increases sales by **0.037%**. Among the three channels, TikTok shows the **largest elasticity**, suggesting it has a greater effect on $ln(Sales)$ than Facebook and Google Ads.
 
 ```{r include=FALSE}
-# Create fitted traffic as a time series
-fitted_sales <- ts(regression1$fitted.values, frequency = freq, start = start_ts)
+fitted_vals <- fitted(regression1)
+actual_vals <- model_df$ln_sales
 
-# Plot actual vs fitted
-plot(ln_sales, type = "l", col = "blue", lwd = 2,
-     main = "Web Traffic", ylab = "Log Sales", xlab = "Time")
+tibble(
+  Index = seq_along(actual_vals),
+  `Actual ln(Sales)` = actual_vals,
+  `Fitted ln(Sales)` = fitted_vals
+) %>%
+  pivot_longer(-Index, names_to = "Series", values_to = "Value") %>%
+  ggplot(aes(Index, Value, colour = Series, linetype = Series)) +
+  geom_line(linewidth = 0.9) +
+  labs(x = "Observation", y = "Log Sales") +
+  theme(legend.position = "top")
 
-lines(fitted_sales, col = "red", lwd = 2)
-
-legend("bottomright",
-       lty = 1, col = c("blue", "red"),
-       legend = c("Logged Sales Data", "Fitted"),
-       cex = 0.75)
-```
-
-```{r echo=FALSE}
-#retrieve model coefficients 
-
-beta_google_ads <- summary(regression1)$coefficients[3,1] #row three column one 
-beta_facebook <- summary(regression1)$coefficients[4,1]  
-beta_tiktok <- summary(regression1)$coefficients[5,1]
-
-# calculate the baseline average sales
-avg_sales <- mean(sales)
-
-# calculate the baseline average advertising spending for each media:
-avg_google_ads <- mean(google_ads)
-avg_facebook <- mean(facebook)
-avg_tiktok <- mean(tiktok)
-
-# Calculate the unit effect 
-theta_tiktok <- beta_tiktok * (avg_sales / avg_tiktok)
-theta_google_ads <- beta_google_ads * (avg_sales / avg_google_ads)
-theta_facebook <- beta_facebook * (avg_sales / avg_facebook)
-
-
-# Calculate spend per channel 
-google_spend <- sum(data$google_ads)
-facebook_spend <- sum(data$facebook)
-tiktok_spend <- sum(data$tiktok)
-
-# Each media's contribution to sales
-tiktok_contribution  <- theta_tiktok  * tiktok_spend
-google_ads_contribution  <- theta_google_ads  * google_spend
-facebook_contribution <- theta_facebook * facebook_spend
-
-
-
-```
-
-
-
-
-```{r include=FALSE}
-# Barplot information
-media_contribution <- c(tiktok_contribution, google_ads_contribution, facebook_contribution)
-                      
-# Round contributions to whole numbers
-media_contribution <- round(media_contribution, digits = 0)
-
-# Media names
-media_names <- c("Tiktok", "Google Ads", "Facebook")
-
-# Create data frame
-df <- data.frame(media_names, media_contribution)
-
-# Barplot
-bar_plot <- ggplot(data = df, aes(x = media_names, y = media_contribution)) +
-  geom_bar(stat = "identity", color = "black",
-           fill = c("darkgreen", "steelblue", "firebrick")) +
-  geom_text(aes(label = media_contribution),
-            vjust = -0.3, size = 3.5) +
-  labs(title = "Contribution to Sales",
-       x = "Media", y = "Contribution") +
-  theme_minimal()
-
-# Change the order of the bars
-bar_plot + scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
-```
-```{r include=FALSE}
-# Total contribution from all media
-allmedia_contribution <- tiktok_contribution + google_ads_contribution + facebook_contribution 
-
-# Percentage contributions
-tiktok_pct       <- tiktok_contribution       / allmedia_contribution
-google_ads_pct  <- google_ads_contribution  / allmedia_contribution
-facebook_pct <- facebook_contribution / allmedia_contribution
-
-
-# Put into a vector
-pct_contribution <- c(tiktok_pct, google_ads_pct, facebook_pct)
-
-# Convert to percentage format
-pct_contribution <- percent(pct_contribution)
-
-# Media names
-media_names <- c("Tiktok","Google Ads", "Facebook")
-
-# Data frame
-df2 <- data.frame(media_names, pct_contribution)
-
-# Barplot for percentage contributions
-bar_plot_pct <- ggplot(data = df2, aes(x = media_names, y = pct_contribution)) +
-  geom_bar(stat = "identity", color = "black",
-           fill = c("darkgreen", "steelblue", "firebrick")) +
-  geom_text(aes(label = pct_contribution),
-            vjust = -0.3, size = 3.5) +
-  labs(title = "Percentage Contribution to Sales",
-       x = "Media", y = "Percentage") +
-  theme_minimal()
-
-# Change the order of the bars
-bar_plot_pct + scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
-
-```
-
-
-```{r echo=FALSE}
-
-# Total cost
-cost_total <- tiktok_spend + google_spend + facebook_spend 
-
-# Vector of costs
-cost <- c(tiktok_spend, google_spend, facebook_spend)
-cost <- round(cost, digits = 0)
-
-# Traffic Contribution vs Cost Data Frame
-df3 <- data.frame(
-  sales_cost = rep(c("Sales", "Cost"), each = 3),
-  media_names = rep(c("Tiktok", "Google Ads", "Facebook"), 2),
-  values = c(media_contribution, cost)
-)
-
-```
-
-```{r include=FALSE}
-# Grouped barplot: Sales vs Cost
-bar_plot3 <- ggplot(data = df3, aes(x = media_names, y = values, fill = sales_cost)) +
-  geom_bar(stat = "identity", color = "black", position = position_dodge()) +
-  labs(title = "Sales vs. Media Cost",
-       x = "Media", y = "Sales and Cost") +
-  theme_minimal() +
-  scale_x_discrete(limits = c("Tiktok", "Google Ads", "Facebook"))
-
-# Display the plot
-bar_plot3
-```
-
-```{r echo=FALSE}
-# Calculate the traffic return (TROMI) for each media
-roi_tiktok  <- tiktok_contribution       / tiktok_spend
-roi_google_ads  <- google_ads_contribution  / google_spend
-roi_facebook <- facebook_contribution / facebook_spend
-
-
-
-# Put ROI values into a vector
-roi <- round(c(roi_tiktok, roi_google_ads, roi_facebook ),2)
-
-# Create data frame
-media_names <- c("Tiktok", "Google Ads", "Facebook")
-df4 <- data.frame(media_names, roi)
-
-# Preview
-#Shead(df4)
 ```
 
 # Question 2 (2 points)
 
-Report the ROI of each marketing channel based on the estimation output in Question 1. Which marketing
-channel yields the highest ROI?
+*Report the ROI of each marketing channel based on the estimation output in Question 1. Which marketing channel yields the highest ROI?*
+
+## Sales Return on Marketing Investment (SROMI) values are:
+
+-   **TikTok:** 0.13\
+-   **Facebook:** 0.15\
+-   **Google Ads:** 0.23
+
+Among the three channels, **Google Ads yields the highest ROI (0.23)**, meaning it generates the most incremental sales per unit of spend. Although the **beta coefficient of TikTok (0.037)** is slightly higher than that of **Google Ads (0.033)**, the **ROI of Google Ads is greater**. This happens because ROI reflects not only the responsiveness of sales to ad spend (elasticity) but also the **sales-to-cost ratio**. In other words, Google Ads delivers more sales per unit of cost, making it the most efficient channel despite TikTok’s higher elasticity. However, all of the channels generate loss for every additional dollar spent. In other words, incremental sales returns are below the break-even.
+
+```{r include=FALSE}
+# Pull betas
+beta_google_ads <- coef(regression1)[["ln_google_ads"]]
+beta_facebook   <- coef(regression1)[["ln_facebook"]]
+beta_tiktok     <- coef(regression1)[["ln_tiktok"]]
+
+# Baselines
+avg_sales    <- mean(sales, na.rm = TRUE)
+avg_google   <- mean(google_ads, na.rm = TRUE)
+avg_facebook <- mean(facebook,   na.rm = TRUE)
+avg_tiktok   <- mean(tiktok,     na.rm = TRUE)
+
+# Unit effects (theta)
+theta_google <- beta_google_ads * (avg_sales / avg_google)
+theta_fb     <- beta_facebook   * (avg_sales / avg_facebook)
+theta_ttk    <- beta_tiktok     * (avg_sales / avg_tiktok)
+
+# Spend totals
+google_spend   <- sum(google_ads, na.rm = TRUE)
+facebook_spend <- sum(facebook,   na.rm = TRUE)
+tiktok_spend   <- sum(tiktok,     na.rm = TRUE)
+
+# Contributions
+contrib_google <- theta_google * google_spend
+contrib_fb     <- theta_fb     * facebook_spend
+contrib_ttk    <- theta_ttk    * tiktok_spend
+
+# ROI (Sales per unit spend)
+roi_df <- tibble(
+  Channel = c("Google Ads", "Facebook", "TikTok"),
+  ROI     = c(contrib_google / google_spend,
+              contrib_fb     / facebook_spend,
+              contrib_ttk    / tiktok_spend)
+) %>%
+  mutate(ROI = round(ROI, 2))
+
+roi_df %>%
+  kable(caption = "Sales Return on Marketing Investment (SROMI) by Channel") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+```
+
+```{r}
+roi_df %>%
+  ggplot(aes(reorder(Channel, ROI), ROI)) +
+  geom_col(color = "black", fill = c("steelblue", "firebrick", "darkgreen")[rank(roi_df$ROI)]) +
+  geom_text(aes(label = ROI), vjust = -0.3, size = 3.6) +
+  labs(
+    x = NULL, 
+    y = NULL,  # remove y-axis label
+    title = "Sales Return on Marketing Investment"  # put it on top
+  ) +
+  coord_cartesian(ylim = c(0, max(roi_df$ROI) * 1.2)) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"), # center & bold
+    axis.text.x = element_text(face = "bold")
+  )
 
 
-```{r echo=FALSE}
+```
 
-# TROMI bar plot
-bar_plot4 <- ggplot(data = df4, aes(x = media_names, y = roi)) +
-  geom_bar(stat = "identity", color = "black",
-           fill = c("darkgreen", "steelblue", "firebrick")) +
-  geom_text(aes(label = roi),
-            vjust = -0.3, size = 3.5) +
-  labs(title = "Sales Return on Marketing Investment (SROMI)",
-       x = "Media", y = "SROMI (Sales per Unit Spend)") +
+# Question 3 (1 point)
+
+*Is the model-recommended optimal budget allocation different from the actual allocation? How do you suggest FourTex should reallocate its budget across TikTok, Facebook, and Google to maximize sales? Support your answers with relevant figures.*
+
+```{r}
+# Actual spend distribution
+actual_spend <- tibble(
+  Channel = c("Google Ads", "Facebook", "TikTok"),
+  Spend   = c(google_spend, facebook_spend, tiktok_spend)
+) %>% mutate(Share = Spend / sum(Spend),
+         Type  = "Current") 
+
+# Elasticity-based optimal share (proportional to betas)
+beta_sum <- beta_google_ads + beta_facebook + beta_tiktok
+opt_share <- tibble(
+  Channel = c("Google Ads", "Facebook", "TikTok"),
+  Share   = c(beta_google_ads, beta_facebook, beta_tiktok) / beta_sum,
+  Type = "Optimal"
+)
+
+bind_rows(
+  actual_spend %>% transmute(Channel, Type = "Current", Share),
+  opt_share     %>% transmute(Channel, Type = "Optimal", Share)
+) %>%
+  mutate(SharePct = scales::percent(Share)) %>%
+  select(-Share) %>%                                     # drop numeric Share
+  pivot_wider(id_cols = Channel,                         # ensure 1 row per Channel
+              names_from = Type, values_from = SharePct) %>%
+  kable(caption = "Current vs. Model-Recommended Budget Shares") %>%
+  kable_styling(full_width = FALSE, position = "center")
+
+
+```
+
+```{r}
+plot_df <- bind_rows(actual_spend, opt_share) %>%
+  mutate(
+    Channel = factor(Channel, levels = c("Facebook", "Google Ads", "TikTok")),
+    Type    = factor(Type, levels = c("Current", "Optimal"))
+  )
+
+ggplot(plot_df, aes(x = Channel, y = Share, fill = Type)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     expand = c(0, 0)) +
+  scale_fill_manual(values = c("Current" = "#1f77b4", "Optimal" = "#ff7f0e")) +
+  labs( title = "Marketing budget: Current vs optimal allocation", x = "Channel", y = "Allocation (%)", fill = "Type" ) +
+  coord_cartesian(ylim = c(0, max(plot_df$Share) * 1.2)) +  # ~20% headroom
   theme_minimal() +
-  scale_x_discrete(limits = c("Tiktok", "Facebook", "Google Ads"))
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),   # centered & bold
+    axis.text.x = element_text(face = "bold"),
+    legend.position = "right"
+  )
 
-# Display plot
-bar_plot4
-```
-Based on the estimation results, the **Sales Return on Marketing Investment (SROMI)** values are:  
-
-- TikTok: **0.13**  
-- Facebook: **0.15**  
-- Google Ads: **0.23**  
-
-**Google Ads yields the highest ROI** among the three channels. 
-
-Although the **beta coefficient of TikTok (0.037)** is slightly higher than that of **Google Ads (0.033)**, the **ROI of Google Ads is greater**.  
-This happens because ROI reflects not only the responsiveness of sales to ad spend (elasticity) but also the **sales-to-cost ratio**.  
-In other words, Google Ads delivers more sales per unit of cost, making it the most efficient channel despite TikTok’s higher elasticity.
-However, all of the channels generate loss for every additional dollar spent.
-
- 
- 
-# Quesiton 3 (1 point)
-Is the model-recommended optimal budget allocation different from the actual allocation? How do you
-suggest FourTex should reallocate its budget across TikTok, Facebook, and Google to maximize sales?
-Support your answers with relevant figures.
-
-
-Yes, the **model-recommended optimal budget allocation** is different from the **current marketing spend distribution**.  
-
-| Channel     | Current Allocation | Optimal Allocation |
-|-------------|-------------------:|-------------------:|
-| TikTok      | 44%               | 36%               |
-| Facebook    | 33%               | 33%               |
-| Google Ads  | 23%               | 30%               |
-
----
-
-## Interpretation  
-
-The model suggests **reducing TikTok’s share** of the budget (from 44% → 36%) and **increasing Google Ads’ share** (from 23% → 30%), while keeping Facebook roughly the same (33%).  
-
-This adjustment reflects the fact that although TikTok has the highest elasticity (beta), **Google Ads delivers the highest ROI due to its better sales-to-cost ratio**.  
-
-By reallocating funds accordingly, FourTex can **maximize overall sales efficiency**, generating more incremental sales for the same total budget.  
-
----
-
-## Recommendation  
-
-- **Decrease TikTok spend by ~8 percentage points**  
-- **Increase Google Ads spend by ~7 percentage points**  
-- **Maintain Facebook at current levels**  
-
-This reallocation balances responsiveness (TikTok’s elasticity) with efficiency (Google Ads’ ROI), leading to a more optimal marketing mix.  
-
-
-
-```{r echo=FALSE}
-# # Calculate spend per channel (done on code chuck above)
-# google_spend <- sum(data$google_ads)
-# facebook_spend <- sum(data$facebook)
-# tiktok_spend <- sum(data$tiktok)
-
-# Combine into a vector
-spend <- c(google_spend, facebook_spend, tiktok_spend)
-channels <- c("Google Ads", "Facebook", "TikTok")
-
-# Create percentages
-pct <- round(spend / sum(spend) * 100)
-
-# Labels with percentages
-labels <- paste0(channels, " (", pct, "%)")
-
-# Plot pie chart
-pie(spend, labels = labels, main = "Marketing Spend Distribution",
-    col = c("steelblue", "firebrick", "darkgreen"))
 
 ```
-```{r echo=FALSE}
 
-# The sum of all media elasticities
-beta_allmedia <- beta_tiktok + beta_google_ads + beta_facebook
+## Recommendation
 
-# Optimal resource allocation (budget share by elasticity)
-optim_tiktok <- beta_tiktok / beta_allmedia
-optim_facebook <- beta_google_ads / beta_allmedia
-optim_google_ads <- beta_facebook / beta_allmedia
+The model suggests **reducing TikTok’s share** of the budget (from 44% → 36%) and **increasing Google Ads’ share** (from 23% → 30%), and **reducing Facebook's share** (from 33% → 30%). This adjustment reflects the fact that although TikTok has the highest elasticity (beta), **Google Ads delivers the highest ROI due to its better sales-to-cost ratio**. By reallocating funds accordingly, FourTex can **maximize overall sales efficiency**, generating more incremental sales for the same total budget. This reallocation balances responsiveness (TikTok’s elasticity) with efficiency (Google Ads’ ROI), leading to a more optimal marketing mix.
 
-# Pie-chart ingredients for optimal allocation
-slices_optim <- c(optim_tiktok, optim_google_ads, optim_facebook)
-slices_optim <- round(slices_optim, digits = 2)
+# Question 4 (3 points)
 
-lbls_optim <- c("Tiktok", "Google Ads", "Facebook")
-pct_optim  <- round(slices_optim * 100)
+*Do different marketing channel pairs have synergistic or antagonistic effects? For each pair of channels (e.g., Facebook–TikTok, Facebook–Google Ads, TikTok–Google Ads), interpret the model results and explain the rationale. Your interpretation should explicitly consider the nature and role of each channel (e.g., TikTok’s reach and virality, Facebook’s targeting, Ad’s awareness-building) rather than giving a generic answer. Support your explanation with relevant model output(s).*
 
-# Add percentage labels
-lbls_optim <- paste(lbls_optim, pct_optim, "%")
+### TikTok
 
-# Pie chart
-pie(slices_optim,
-    labels = lbls_optim,
-    col = rainbow(length(lbls_optim)),
-    main = "Optimal Budget Allocation")
-```
+The nature of the short-form video platform comes with massive **reach and virality**, especially among the younger demographic. The platform primarily serves as a **top-of-funnel** marketing channel, where it is utilised correctly, it can serve as an engine to build **brand awareness**, **cultural relevance**, and **emotional investment** with the audience. The strength of the platform is its ability to create quick spikes in visibility and influence purchase intent indirectly. Conversion tends to be indirect, ROI may often look low if measured only on immediate sales.
 
-# Quesiton 4 
-Do different marketing channel pairs have synergistic or antagonistic effects? For each pair of channels
-(e.g., Facebook–TikTok, Facebook–Google Ads, TikTok–Google Ads), interpret the model results and
-explain the rationale. Your interpretation should explicitly consider the nature and role of each channel
-(e.g., TikTok’s reach and virality, Facebook’s targeting, Ad’s awareness-building) rather than giving a
-generic answer. Support your explanation with relevant model output(s).
+### Facebook (Meta Ads)
 
+A mature social advertising platform with advanced **targeting and re-targeting** capabilities. The strength of Meta Ads is in **mid-funnel** activities, engaging users who already have some awareness and nudging them toward consideration or repeat purchase. Simultaneously enhanced by highly customizable audience segmentation, effective for re-targeting website visitors or lookalike audiences.
 
-We extended the model to include interaction terms between marketing channels.
+### Google Ads
 
-$$
-\ln(Sales_t) \;=\; \beta_0
+A search and display based advertising platform capturing **active intent**. Primarily **bottom-funnel** best at converting users who are already looking for a product or solution. **High conversion rates** because it targets people with purchase intent, ROI is usually stronger in short-term sales attribution. However, out of the three marketing channels, Google Ads historically is the most expensive per click
+
+## General Model Specification
+
+\begin{align}
+\ln(Sales_t) \;=\;& \; \beta_0
 + \beta_1 \cdot \ln(Sales_{t-1})
-+ \beta_2 \cdot \ln(GoogleAds_t)
-+ \beta_3 \cdot \ln(Facebook_t)
++ \beta_2 \cdot \ln(GoogleAds_t) \\
+&+ \beta_3 \cdot \ln(Facebook_t)
 + \beta_4 \cdot \ln(TikTok_t)
-+ \beta_5 \cdot \ln(GoogleAds_t) \cdot \ln(Facebook_t)
-+ \beta_6 \cdot \ln(GoogleAds_t) \cdot \ln(TikTok_t)
-+ \beta_7 \cdot \ln(Facebook_t) \cdot \ln(TikTok_t)
++ \beta_5 \cdot \ln(GoogleAds_t)\ln(Facebook_t) \\
+&+ \beta_6 \cdot \ln(GoogleAds_t)\ln(TikTok_t)
++ \beta_7 \cdot \ln(Facebook_t)\ln(TikTok_t)
 + \varepsilon_t
-$$
+\end{align}
 
-
-
-```{r echo=FALSE}
-
-# Extended regression with interaction terms
+```{r}
 regression2 <- lm(
   ln_sales ~ Lag1_ln_sales + ln_google_ads + ln_facebook + ln_tiktok +
     ln_google_ads:ln_facebook +
     ln_google_ads:ln_tiktok +
-    ln_facebook:ln_tiktok
+    ln_facebook:ln_tiktok,
+  data = model_df
 )
 
-# Extended regression with interaction terms
+reg2_tidy <- broom::tidy(regression2) %>%
+  mutate(term = recode(term,
+    "(Intercept)"                         = "Intercept",
+    "Lag1_ln_sales"                       = "Lagged ln(Sales)",
+    "ln_google_ads"                       = "ln(Google Ads)",
+    "ln_facebook"                         = "ln(Facebook)",
+    "ln_tiktok"                           = "ln(TikTok)",
+    "ln_google_ads:ln_facebook"           = "ln(Google) × ln(Facebook)",
+    "ln_google_ads:ln_tiktok"             = "ln(Google) × ln(TikTok)",
+    "ln_facebook:ln_tiktok"               = "ln(Facebook) × ln(TikTok)"
+  ))
 
-# Summary of results
-summary(regression2)
+reg2_tidy %>%
+  mutate(estimate = round(estimate, 4),
+         p.value  = scales::pvalue(p.value)) %>%
+  select(Term = term, Estimate = estimate, `p-value` = p.value) %>%
+  kable(caption = "Interaction Terms (Synergies/Antagonisms)") %>%
+  kable_styling(full_width = FALSE, position = "center")
 
 ```
 
+## Channel Pair Interpretations
 
-| Term                        | Estimate | p-value  | Interpretation              |
-|-----------------------------|---------:|---------:|-----------------------------|
-| ln_google_ads:ln_facebook   | -0.0017  | 0.026    | Negative, significant → antagonism |
-| ln_google_ads:ln_tiktok     | -0.0013  | 0.015    | Negative, significant → antagonism |
-| ln_facebook:ln_tiktok       | -0.0006  | 0.156    | Negative, not significant → neutral |
+### 1. Facebook × TikTok
 
----
+-   **Hypothesis:**\
+    TikTok provides **reach and virality** (top-of-funnel), while Facebook specializes in **targeting & re-targeting** (mid-funnel). This suggests potential **synergy**, where TikTok builds awareness and Facebook converts those customers by through customer segmentation and targeted ads.
 
-## Interpretation by Channel Pair  
+-   **Model result:**\
+    Coefficient = –0.0006, p = 0.156
 
-### Facebook – TikTok  
-- **Hypothesis:** Expected synergy (TikTok awareness feeding Facebook retargeting).  
-- **Result:** Coefficient –0.0006, not significant → no strong evidence of synergy or antagonism.  
-- **Takeaway:** Despite theoretical complementarity, the data suggest the two platforms work **independently** in this context.  
+-   **Interpretation:**\
+    The effect is essentially **neutral** as the coefficient is negligible and not significant . Despite out hypothesis complementarity, TikTok’s awareness traffic does not significantly boost Facebook’s targeting effectiveness. The two platforms appear to operate **independently**.
 
----
+### 2. Google Ads × Facebook
 
-### Facebook – Google Ads  
-- **Hypothesis:** Expected synergy (Facebook warms up users, Google captures intent).  
-- **Result:** Coefficient –0.0017, significant → antagonism.  
-- **Takeaway:** These channels likely target overlapping audiences, leading to **cannibalization** instead of complementarity.  
+-   **Hypothesis (theory):**\
+    Facebook nurtures buyers with content and engagement, while Google Ads captures **intent-driven searches** (bottom-funnel). This could produce **synergy**, where Facebook primes customers and Google closes the sale.
 
----
+-   **Model result:**\
+    Coefficient = –0.0012, p = 0.026
 
-### TikTok – Google Ads  
-- **Hypothesis:** Expected antagonism due to overlap.  
-- **Result:** Coefficient –0.0013, significant → antagonism confirmed.  
-- **Takeaway:** TikTok awareness overlaps with Google’s intent capture, producing **diminishing incremental returns**.  
+-   **Interpretation:**\
+    The channels show **antagonism** as the coefficient is negative and significant. Their overlapping audiences reduce incremental effectiveness. Customers exposed to Facebook may later convert through Google Ads, leading to **cannibalization** rather than reinforcement. Which indicates that the marketing channels end up influencing or converting the same customer. Instead of adding new sakes they compete for credit for the same purchase.
 
----
+### 3. Google Ads × TikTok
 
-## Overall Insight  
+-   **Hypothesis (theory):**\
+    TikTok creates mass **awareness & reach**, while Google captures high-intent searches. If distinct, this could generate **synergy**.
 
-- **Mismatch with expectations:** While theory suggested synergy in some pairs, the model finds **no synergies** and two significant antagonistic relationships.  
-- **Most antagonistic pairs:** Google–Facebook and Google–TikTok.  
-- **Strategic implication:** FourTex should **avoid heavy simultaneous investment in Google Ads with either Facebook or TikTok**, since their combined effect is weaker than individual contributions. Instead, budgets should be carefully balanced so each platform can play its distinct role:  
-  - TikTok → awareness & virality  
-  - Facebook → precise targeting/retargeting  
-  - Google Ads → intent-driven capture  
+-   **Model result:**\
+    Coefficient = –0.0013, p = 0.015
 
+-   **Interpretation:**\
+    Evidence of **antagonism** as the coefficient is negative and significant. TikTok-influenced customers often still rely on Google searches before purchase, so Google “captures” the same users. The two channels cannibalize each other’s contributions rather than complementing.
 
+## Summary of Channel Interactions
 
-# Question 4 — Hypotheses vs Model Results  
+| Channel Pair          | Hypothesized Effect | Model Result | Conclusion          |
+|-------------------|------------------|------------------|------------------|
+| Facebook × TikTok     | Synergy             | Neutral      | **No synergy**      |
+| Google Ads × Facebook | Synergy             | Antagonism   | **Cannibalization** |
+| Google Ads × TikTok   | Synergy             | Antagonism   | **Cannibalization** |
 
-| Channel Pair        | Hypothesis | Rationale | Model Outcome | Interpretation |
-|---------------------|------------|-----------|---------------|----------------|
-| **Facebook – TikTok** | Synergy | TikTok builds **broad awareness & virality**, Facebook excels at **precision targeting** → expected complementarity. | Coefficient –0.0006 (not significant) → Neutral | Despite theoretical complementarity, the data show **no strong interaction**; platforms act independently. |
-| **Facebook – Google Ads** | Synergy | Facebook nurtures users mid-funnel, Google captures **high-intent search traffic** → expected reinforcement. | Coefficient –0.0017 (significant, negative) → Antagonism | Results show **overlap/cannibalization**: both platforms may compete for the same audience, weakening returns. |
-| **TikTok – Google Ads** | Antagonism | TikTok drives **awareness**, but many of these users would eventually be captured by Google search anyway → expected overlap. | Coefficient –0.0013 (significant, negative) → Antagonism | Hypothesis confirmed: TikTok awareness overlaps with Google’s intent capture, leading to **diminishing incremental returns**. |
+**Overall Insight:**\
+- No synergies were detected in the data.\
+- Significant **antagonism** occurs when Google Ads runs in parallel with either TikTok or Facebook.\
+- **Facebook–TikTok** appears neutral, so they can be combined without major loss of efficiency.
 
----
+# Appendix
 
-## Overall Insight  
-
-- **Hypothesized synergies** (Facebook–TikTok, Facebook–Google Ads) were **not supported** by the model.  
-- **Antagonism** between **Google–Facebook** and **Google–TikTok** was observed, confirming that simultaneous spending reduces efficiency.  
-- **Confirmed hypothesis:** TikTok–Google Ads antagonism.  
-- **Recommendation:** Structure budgets so each platform plays its distinct role:  
-  - TikTok → awareness & virality  
-  - Facebook → targeting & retargeting  
-  - Google Ads → intent-driven capture  
-
-
+```{r, echo=FALSE, results='asis'}
+# Extract the R code from the current Rmd
+code_file <- knitr::purl("Assignment1.rmd", quiet = TRUE)
+cat("```r\n")
+cat(readLines(code_file), sep = "\n")
+cat("\n```")
+```

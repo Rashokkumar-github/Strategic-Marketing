@@ -1,0 +1,140 @@
+---
+title: "Assignment 2"
+output: html_document
+date: "2025-09-21"
+---
+
+```{r}
+# Load required libraries
+library(car)      
+library(dplyr)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+rm(list=ls())
+```
+
+# Question 1 (1 point)
+
+Run a single logistic regression model on the full sample of customers. The logistic regression model should
+predict the probability that a customer churns by using the following variables: monthly charges, total
+charges, gender, senior citizen status, partner, dependents, tenure, phone service, streaming movies,
+contract type, paperless billing, and payment method. Make sure to convert all categorical variables to
+factors for appropriate analysis. Note that some variables are already excluded to avoid multicollinearity.
+Report only the variance inflation factors (VIFs) for each variable. What do you conclude? (No need to
+report the final model output.)
+
+```{r}
+stopifnot(file.exists("Telco.csv"))
+data <- readr::read_csv("Telco.csv", show_col_types = FALSE)
+```
+
+
+```{r}
+# Convert relaveant cols to as.factor
+# categorical_vars <- c("gender", "SeniorCitizen", "Partner", "Dependents", 
+#                      "PhoneService", "StreamingMovies", "Contract", 
+#                      "PaperlessBilling", "PaymentMethod", "Churn")
+# 
+# data[categorical_vars] <- lapply(data[categorical_vars], as.factor)
+
+data$Churn = as.factor(data$Churn)
+data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], as.factor)
+
+
+```
+
+
+```{r}
+# Build the logistic regression model
+model <- glm(Churn ~ MonthlyCharges + TotalCharges + gender + SeniorCitizen + 
+             Partner + Dependents + tenure + PhoneService + StreamingMovies + 
+             Contract + PaperlessBilling + PaymentMethod,
+             data = data,
+             family = "binomial")
+
+summary(model)
+
+# Calculate VIF values
+vif_values <- vif(model)
+
+vif_values
+```
+# Quesiton 2 (3 points)
+Exclude total charges from the model in Question 1 and re-run the logistic regression. Present the final
+model output. Select three significant variables and interpret their coefficients (i.e., sign, significance, exact relationship between independent and dependent variables).
+
+```{r}
+model_2 <-  glm(Churn ~ MonthlyCharges + gender + SeniorCitizen + 
+             Partner + Dependents + tenure + PhoneService + StreamingMovies + 
+             Contract + PaperlessBilling + PaymentMethod,
+             data = data,
+             family = "binomial")
+
+summary(model_2)
+```
+# Question 3 (3 points)
+
+Provide two actionable recommendations in light of the model results of Question 2 (i.e., the one excluding
+total charges). Provide brief justification for each recommendation.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Question 4 (1 points)
+Use the model of Question 2 (i.e., the one excluding total charges). Generate and provide two lists: one
+with the 10 customers having the highest predicted churn probabilities and another with the 10 customers
+having the lowest predicted churn probabilities. Each list should include the customer ID, the predicted
+churn probability, and the actual churn outcome. Present these results in a well-organized table.
+
+```{r}
+# We add the predicted variable to the data set. 
+
+data <- data %>% 
+  mutate(Prediction = predict(model_2, type = 'response'))
+
+colnames(data)
+
+top10 <- data %>% 
+  dplyr :: select(customerID, Churn, Prediction) %>% 
+  arrange(desc(Prediction)) %>% 
+  head(10)
+
+
+bottom10 <- data %>% 
+  dplyr ::select(customerID, Churn, Prediction) %>% 
+  arrange(Prediction) %>% 
+  head(10)
+
+kable(top10, caption = "Top 10 Customers with Highest Predicted Churn Probability") %>%
+  kable_styling(full_width = FALSE)
+
+kable(bottom10, caption = "Top 10 Customers with Lowest Predicted Churn Probability") %>%
+  kable_styling(full_width = FALSE)
+
+grid.arrange(
+  tableGrob(top10, rows = NULL),
+  tableGrob(bottom10, rows = NULL),
+  ncol = 2,
+  top = "Top 10 vs Bottom 10 Predicted Churn Probabilities"
+)
+
+```
+
+
+
+
+
