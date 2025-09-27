@@ -1,0 +1,151 @@
+---
+title: "Assignment 2"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-09-21"
+---
+
+```{r}
+# Load required libraries
+library(car)      
+library(dplyr)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(gridExtra)
+rm(list=ls())
+```
+
+# Question 1 (1 point)
+
+Run a single logistic regression model on the full sample of customers. The logistic regression model should
+predict the probability that a customer churns by using the following variables: monthly charges, total
+charges, gender, senior citizen status, partner, dependents, tenure, phone service, streaming movies,
+contract type, paperless billing, and payment method. Make sure to convert all categorical variables to
+factors for appropriate analysis. Note that some variables are already excluded to avoid multicollinearity.
+Report only the variance inflation factors (VIFs) for each variable. What do you conclude? (No need to
+report the final model output.)
+
+```{r}
+stopifnot(file.exists("Telco.csv"))
+data <- readr::read_csv("Telco.csv", show_col_types = FALSE)
+str(data)
+```
+
+
+```{r}
+# Convert relaveant cols to as.factor
+# categorical_vars <- c("gender", "SeniorCitizen", "Partner", "Dependents", 
+#                      "PhoneService", "StreamingMovies", "Contract", 
+#                      "PaperlessBilling", "PaymentMethod", "Churn")
+# 
+# data[categorical_vars] <- lapply(data[categorical_vars], as.factor)
+
+data$Churn = as.factor(data$Churn)
+data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], as.factor)
+
+
+```
+
+
+```{r}
+# Build the logistic regression model
+model <- glm(Churn ~ MonthlyCharges + TotalCharges + gender + SeniorCitizen + 
+             Partner + Dependents + tenure + PhoneService + StreamingMovies + 
+             Contract + PaperlessBilling + PaymentMethod,
+             data = data,
+             family = "binomial")
+
+summary(model)
+
+# Calculate VIF values
+vif_values <- vif(model)
+
+vif_values
+```
+What do you conclude?
+
+Majorioty of the predictors have GVIF < 2; which means there is no multicollinearity issues. 
+There is a possibility of multicollinearity between 3 variables: monthly charges, total charges and tenure (GVIF > 2). This result is expected since all 3 variables are related to the same indicator: TotalCharges ≈ MonthlyCharges × tenure. Total charges has the highest multicollinearity issue, thus keeping it both with tenure might be problematic, since effects might overlap. To improve interpretabilioty of the results, we will exclude TotalCharges from the final model. 
+
+# Quesiton 2 (3 points)
+Exclude total charges from the model in Question 1 and re-run the logistic regression. Present the final
+model output. Select three significant variables and interpret their coefficients (i.e., sign, significance, exact relationship between independent and dependent variables).
+
+```{r}
+model_2 <-  glm(Churn ~ MonthlyCharges + gender + SeniorCitizen + 
+             Partner + Dependents + tenure + PhoneService + StreamingMovies + 
+             Contract + PaperlessBilling + PaymentMethod,
+             data = data,
+             family = "binomial")
+
+summary(model_2)
+```
+Interpretation: 
+
+1. PhoneServiceYes- Customers with phone service have 57% (exp(-0.8447) ≈ 0.43) lower odds of churning compared to those without phone service, holding all other factors constant.
+
+2. Customers on a two-year contract have 82% (exp(-1.6995) ≈ 0.18) lower odds of churning compared to those on a month-to-month contract, ceteris paribus. This suggest that customers with long- term costracts have higher probability of staying in the company.
+
+3. PaymentMethodElectronic check- Customers who pay by electronic check have 49% (exp(0.3986) ≈ 1.49) higher odds of churning compared to those paying by automatic bank transfer, ceteris paribus. This suggest that customers with electronic check as a payment method are in a high-risk group for churn.
+
+
+# Question 3 (3 points)
+
+Provide two actionable recommendations in light of the model results of Question 2 (i.e., the one excluding
+total charges). Provide brief justification for each recommendation.
+
+1. Promote long-term contracts with added benefits.
+Since customers on two-year contracts have 82% lower odds of churning compared to month-to-month customers, the company should encourage longer contracts. 
+This can be done by offering special discounts, loyalty perks, or bundled services (e.g. internet + streaming) to incentivize signing longer contract. Strengthening these offers will help lock in customers and reduce churn risk.
+
+2. Improve retention strategies for high-risk payment methods.
+Customers paying by electronic check have 49% higher odds of churning compared to those using automatic bank transfers. The company should target this group with retention campaigns, such as promoting automatic payment options, offering small discounts for switching payment methods, or providing reminders and support for electronic check users. 
+Addressing this high-risk segment directly can reduce churn.
+
+
+# Question 4 (1 points)
+Use the model of Question 2 (i.e., the one excluding total charges). Generate and provide two lists: one
+with the 10 customers having the highest predicted churn probabilities and another with the 10 customers
+having the lowest predicted churn probabilities. Each list should include the customer ID, the predicted
+churn probability, and the actual churn outcome. Present these results in a well-organized table.
+
+```{r}
+# We add the predicted variable to the data set. 
+
+data <- data %>% 
+  mutate(Prediction = predict(model_2, type = 'response'))
+
+colnames(data)
+
+top10 <- data %>% 
+  dplyr :: select(customerID, Churn, Prediction) %>% 
+  arrange(desc(Prediction)) %>% 
+  head(10)
+
+
+bottom10 <- data %>% 
+  dplyr ::select(customerID, Churn, Prediction) %>% 
+  arrange(Prediction) %>% 
+  head(10)
+
+kable(top10, caption = "Top 10 Customers with Highest Predicted Churn Probability") %>%
+  kable_styling(full_width = FALSE)
+
+kable(bottom10, caption = "Top 10 Customers with Lowest Predicted Churn Probability") %>%
+  kable_styling(full_width = FALSE)
+
+grid.arrange(
+  tableGrob(top10, rows = NULL),
+  tableGrob(bottom10, rows = NULL),
+  ncol = 2,
+  top = "Top 10 vs Bottom 10 Predicted Churn Probabilities"
+)
+
+```
+
+
+
+
+
