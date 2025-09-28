@@ -12,6 +12,7 @@ library(tidyverse)
 library(knitr)
 library(kableExtra)
 library(gridExtra)
+getwd()
 rm(list=ls())
 ```
 
