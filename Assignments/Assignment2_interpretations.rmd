@@ -11,8 +11,10 @@ output:
   pdf_document:
     latex_engine: xelatex
   html_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
-
 
 ```{r include=FALSE}
 # Load required libraries
@@ -30,20 +32,25 @@ rm(list=ls())
 
 # Question 1
 
-Run a single logistic regression model on the full sample of customers. The logistic regression model should
-predict the probability that a customer churns by using the following variables: monthly charges, total
-charges, gender, senior citizen status, partner, dependents, tenure, phone service, streaming movies,
-contract type, paperless billing, and payment method. Make sure to convert all categorical variables to
-factors for appropriate analysis. Note that some variables are already excluded to avoid multicollinearity.
-Report only the variance inflation factors (VIFs) for each variable. What do you conclude? (No need to
-report the final model output.)
+*Run a single logistic regression model on the full sample of customers.
+The logistic regression model should predict the probability that a
+customer churns by using the following variables: monthly charges, total
+charges, gender, senior citizen status, partner, dependents, tenure,
+phone service, streaming movies, contract type, paperless billing, and
+payment method. Make sure to convert all categorical variables to
+factors for appropriate analysis. Note that some variables are already
+excluded to avoid multicollinearity. Report only the variance inflation
+factors (VIFs) for each variable. What do you conclude? (No need to
+report the final model output.)*
+
+To test for multicollinearity, the variance inflation factors (VIFs) of
+all predictors in the logistic regression model were examined.
 
 ```{r include=FALSE}
 stopifnot(file.exists("Telco.csv"))
 data <- readr::read_csv("Telco.csv", show_col_types = FALSE)
 str(data)
 ```
-
 
 ```{r include=FALSE}
 # Convert relaveant cols to as.factor
@@ -58,7 +65,6 @@ data[sapply(data, is.character)] <- lapply(data[sapply(data, is.character)], as.
 
 
 ```
-
 
 ```{r include=FALSE}
 # Build the logistic regression model
@@ -99,19 +105,33 @@ if (is.matrix(v)) {
 kable(vif_table, caption = "VIF Values for each variable")
 ```
 
-
-Most predictors show a GVIF value below 2, indicating that multicollinearity is not a concern for the majority of the variables. However, three predictors—**MonthlyCharges**, **TotalCharges**, and **tenure**—exhibit GVIF values above 2. This outcome is expected, as these variables are inherently related:  
+Most predictors show a GVIF value below 2, indicating that
+multicollinearity is not a concern for the majority of the variables as
+it is way below the accaptable treshold of 3. However, three
+predictors—**MonthlyCharges**, **TotalCharges**, and **tenure**—exhibit
+GVIF values above 2. This outcome is expected, as these variables are
+inherently related:
 
 $$
 \text{TotalCharges} \approx \text{MonthlyCharges} \times \text{tenure}
 $$
 
-Among them, **TotalCharges** shows the highest degree of multicollinearity. Keeping it alongside **tenure** may reduce the clarity of the model due to overlapping effects. To enhance interpretability, we will exclude **TotalCharges** from the final specification.
+Among them, **TotalCharges** shows the highest degree of
+multicollinearity. Keeping it alongside **tenure** may reduce the
+clarity of the model due to overlapping effects. To enhance
+interpretability, we will exclude **TotalCharges** from the final
+specification.
 
+# Question 2
 
-# Quesiton 2
-Exclude total charges from the model in Question 1 and re-run the logistic regression. Present the final
-model output. Select three significant variables and interpret their coefficients (i.e., sign, significance, exact relationship between independent and dependent variables).
+*Exclude total charges from the model in Question 1 and re-run the
+logistic regression. Present the final model output. Select three
+significant variables and interpret their coefficients (i.e., sign,
+significance, exact relationship between independent and dependent
+variables).*
+
+**TotalCharges** is excluded and the logistic regression is re-ran.
+Table 2 shows the results.
 
 ```{r include=FALSE}
 model_2 <-  glm(Churn ~ MonthlyCharges + gender + SeniorCitizen + 
@@ -137,34 +157,55 @@ tidy_model <- tidy(model_2) |>
 kable(tidy_model, caption = "Results from the Logistic Model")
 ```
 
-Interpretation: 
+Interpretation:
 
-1. PhoneServiceYes- Customers with phone service have 57% (exp(-0.8447) ≈ 0.43) lower odds of churning compared to those without phone service, holding all other factors constant.
+1.  **PhoneServiceYes**: Customers with phone service have 57%
+    (exp(-0.8447) ≈ 0.43) lower odds of churning compared to those
+    without phone service, holding all other factors constant.
 
-2. Customers on a two-year contract have 82% (exp(-1.6995) ≈ 0.18) lower odds of churning compared to those on a month-to-month contract, ceteris paribus. This suggest that customers with long- term costracts have higher probability of staying in the company.
+2.  **Contract two year**: Customers on a two-year contract have 82%
+    (exp(-1.6995) ≈ 0.18) lower odds of churning compared to those on a
+    month-to-month contract, ceteris paribus. This suggest that
+    customers with long- term contracts have higher probability of
+    staying in the company.
 
-3. PaymentMethodElectronic check- Customers who pay by electronic check have 49% (exp(0.3986) ≈ 1.49) higher odds of churning compared to those paying by automatic bank transfer, ceteris paribus. This suggest that customers with electronic check as a payment method are in a high-risk group for churn.
-
+3.  **PaymentMethodElectronic check**: Customers who pay by electronic
+    check have 49% (exp(0.3986) ≈ 1.49) higher odds of churning compared
+    to those paying by automatic bank transfer, ceteris paribus. This
+    suggest that customers with electronic check as a payment method are
+    in a high-risk group for churn.
 
 # Question 3
 
-Provide two actionable recommendations in light of the model results of Question 2 (i.e., the one excluding
-total charges). Provide brief justification for each recommendation.
+*Provide two actionable recommendations in light of the model results of
+Question 2 (i.e., the one excluding total charges). Provide brief
+justification for each recommendation.*
 
-1. Promote long-term contracts with added benefits.
-Since customers on two-year contracts have 82% lower odds of churning compared to month-to-month customers, the company should encourage longer contracts. 
-This can be done by offering special discounts, loyalty perks, or bundled services (e.g. internet + streaming) to incentivize signing longer contract. Strengthening these offers will help lock in customers and reduce churn risk.
+1.  Promote long-term contracts with added benefits. Since customers on
+    two-year contracts have 82% lower odds of churning compared to
+    month-to-month customers, the company should encourage longer
+    contracts. This can be done by offering special discounts, loyalty
+    perks, or bundled services (e.g. internet + streaming) to
+    incentivize signing longer contract. Strengthening these offers will
+    help lock in customers and reduce churn risk.
 
-2. Improve retention strategies for high-risk payment methods.
-Customers paying by electronic check have 49% higher odds of churning compared to those using automatic bank transfers. The company should target this group with retention campaigns, such as promoting automatic payment options, offering small discounts for switching payment methods, or providing reminders and support for electronic check users. 
-Addressing this high-risk segment directly can reduce churn.
-
+2.  Improve retention strategies for high-risk payment methods.
+    Customers paying by electronic check have 49% higher odds of
+    churning compared to those using automatic bank transfers. The
+    company should target this group with retention campaigns, such as
+    promoting automatic payment options, offering small discounts for
+    switching payment methods, or providing reminders and support for
+    electronic check users. Addressing this high-risk segment directly
+    can reduce churn.
 
 # Question 4
-Use the model of Question 2 (i.e., the one excluding total charges). Generate and provide two lists: one
-with the 10 customers having the highest predicted churn probabilities and another with the 10 customers
-having the lowest predicted churn probabilities. Each list should include the customer ID, the predicted
-churn probability, and the actual churn outcome. Present these results in a well-organized table.
+
+*Use the model of Question 2 (i.e., the one excluding total charges).
+Generate and provide two lists: one with the 10 customers having the
+highest predicted churn probabilities and another with the 10 customers
+having the lowest predicted churn probabilities. Each list should
+include the customer ID, the predicted churn probability, and the actual
+churn outcome. Present these results in a well-organized table.*
 
 ```{r include=FALSE}
 # We add the predicted variable to the data set. 
@@ -222,7 +263,6 @@ grid.arrange(
 )
 ```
 
-
 ```{r echo=FALSE}
 grid.arrange(
   tg1, tg2,
@@ -233,8 +273,3 @@ grid.arrange(
 )
 
 ```
-
-
-
-
-
