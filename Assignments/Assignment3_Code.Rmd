@@ -69,10 +69,103 @@ Elbow method: the curve starts to flatten after k = 4
 Silhouette method: highest average silhouette width at k = 4
 
 ```{r kmeans include=FALSE}
+# Perform k
 kmeans_result <- kmeans(analysis_data_scaled, centers = 4, nstart = 25)
-kmeans_result
+
+# Add cluster to original data set
+hotel_customers$Cluster <- as.factor(kmeans_result$cluster)
 ```
 
 - centers = 4, the found in Q1
 - nstart = 25, → runs the algorithm 25 times with different starting points, after it keeps the best result -> this reduces the chance of getting stuck in a local minimum, as mentioned in Lecture 6 (slide 43)
 
+```{r plot cluster sizes include=FALSE}
+# Create data frame
+cluster_sizes <- data.frame(
+  Cluster = factor(1:4),
+  Size = kmeans_result$size
+)
+
+# Plot cluster sizes
+ggplot(cluster_sizes, aes(x = Cluster, y = Size, fill = Cluster)) +
+  geom_col(show.legend = FALSE) +
+  labs(
+    title = "Cluster Sizes",
+    x = "Cluster",
+    y = "Number of Customers"
+  ) +
+  theme_minimal()
+```
+
+```{r plot segmentation solution include=FALSE}
+# Visualize the 4-cluster segmentation solution
+fviz_cluster(kmeans_result, data = analysis_data_scaled,
+             ellipse.type = "norm",
+             geom = "point",
+             palette = "Set2",
+             main = "K-Means Segmentation Solution") +
+  theme_minimal(base_size = 13)
+```
+```{r plot segmentation solution include=FALSE}
+# Compute the mean of each variable per cluster
+cluster_profile <- hotel_customers %>%
+  group_by(Cluster) %>%
+  summarise(
+    Age = mean(Age, na.rm = TRUE),
+    AverageLeadTime = mean(AverageLeadTime, na.rm = TRUE),
+    DaysSinceCreation = mean(DaysSinceCreation, na.rm = TRUE),
+    LodgingRevenue = mean(LodgingRevenue, na.rm = TRUE),
+    OtherRevenue = mean(OtherRevenue, na.rm = TRUE),
+    PersonsNights = mean(PersonsNights, na.rm = TRUE),
+    RoomNights = mean(RoomNights, na.rm = TRUE),
+    DaysSinceLastStay = mean(DaysSinceLastStay, na.rm = TRUE),
+    DaysSinceFirstStay = mean(DaysSinceFirstStay, na.rm = TRUE)
+  ) %>%
+  pivot_longer(-Cluster, names_to = "Variable", values_to = "Average")
+
+# Bar plot of average variable values per cluster
+ggplot(cluster_profile, aes(x = Variable, y = Average, fill = Cluster)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Overall Segmentation Solution by Mean",
+    x = "Variable",
+    y = "Average Value"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r lodging revenue include=FALSE}
+# Compute average and total revenues per cluster
+lodging_plot <- hotel_customers %>%
+  group_by(Cluster) %>%
+  summarise(avg_lodgingrevenue = mean(LodgingRevenue, na.rm = TRUE)) %>%
+  ggplot(aes(x = Cluster, y = avg_lodgingrevenue, fill = Cluster)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = round(avg_lodgingrevenue, 0)), vjust = -0.5) +
+  labs(
+    title = "Average Lodging Revenue per Customer by Cluster",
+    x = "Cluster",
+    y = "Average Lodging Revenue (€)"
+  ) +
+  theme_minimal(base_size = 13)
+
+lodging_plot
+```
+
+```{r other revenue include=FALSE}
+other_plot <- hotel_customers %>%
+  group_by(Cluster) %>%
+  summarise(avg_otherrevenue = mean(OtherRevenue, na.rm = TRUE)) %>%
+  ggplot(aes(x = Cluster, y = avg_otherRevenue, fill = Cluster)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = round(avg_otherRevenue, 0)), vjust = -0.5) +
+  labs(
+    title = "Average Other Revenue per Customer by Cluster",
+    x = "Cluster",
+    y = "Average Other Revenue (€)"
+  ) +
+  theme_minimal(base_size = 13)
+
+other_plot
+```
