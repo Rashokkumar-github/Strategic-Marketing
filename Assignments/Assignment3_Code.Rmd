@@ -1,0 +1,78 @@
+---
+title: "Assignment3_code"
+output: html_document
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+---
+
+```{r setup}
+# Load required packages
+library(tidyverse)
+library(factoextra)
+library(cluster)
+
+# Load dataset
+hotel_customers <- read.csv("/Users/andrejr/Documents/Universiteit/MSc Data Science & Marketing Analytics/Strategic Marketing Decision Making/Group assignment 3/HotelCustomersSubset_sample.csv")
+
+# Quick look at the data
+str(hotel_customers)
+head(hotel_customers)
+summary(hotel_customers)
+
+# Set seed
+set.seed(123)
+```
+
+```{r cleaning}
+# Convert Age to integer
+hotel_customers$Age <- as.numeric(hotel_customers$Age)
+
+# Remove missing and unrealistic age values
+hotel_customers <- hotel_customers %>%
+  filter(!is.na(Age) & Age >= 18 & Age <= 95)
+```
+
+```{r select data include=FALSE}
+# Select the variables
+selected_variables <- c(
+  "Age","AverageLeadTime","DaysSinceCreation",
+  "LodgingRevenue","OtherRevenue",
+  "PersonsNights","RoomNights",
+  "DaysSinceLastStay","DaysSinceFirstStay"
+)
+
+# Keep columns of selected variables and check for missing values 
+analysis_data <- hotel_customers %>%
+  select(all_of(selected_variables)) %>%
+  drop_na()
+```
+
+```{r scale include=FALSE}
+# Standardize all variables
+analysis_data_scaled <- scale(analysis_data)
+```
+
+```{r scale include=FALSE}
+# Standardize all variables
+analysis_data_scaled <- scale(analysis_data)
+```
+
+```{r optimal k include=FALSE}
+# Check with elbow method
+fviz_nbclust(analysis_data_scaled, kmeans, method = "wss", k.max = 13) 
+
+# Check with silhouette method
+fviz_nbclust(analysis_data_scaled, kmeans, method = "silhouette", k.max = 13) 
+```
+
+So in both cases k seems to be the optimal number of cluster
+Elbow method: the curve starts to flatten after k = 4
+Silhouette method: highest average silhouette width at k = 4
+
+```{r kmeans include=FALSE}
+kmeans_result <- kmeans(analysis_data_scaled, centers = 4, nstart = 25)
+kmeans_result
+```
+
+- centers = 4, the found in Q1
+- nstart = 25, → runs the algorithm 25 times with different starting points, after it keeps the best result -> this reduces the chance of getting stuck in a local minimum, as mentioned in Lecture 6 (slide 43)
+
