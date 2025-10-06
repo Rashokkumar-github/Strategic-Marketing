@@ -116,7 +116,7 @@ print(p2)
 ```
 
 
-To find the optimal number of clusters we made use of the Elbow and Silhouette method. One one hand, the elbow method shows evaluates how the within-cluster variance decreases as the number of cluster decreases. In the other hands, the silhouette method measures how well each observation fits within its assigned cluster. Both figures are presented above. 
+To find the optimal number of clusters we made use of the Elbow and Silhouette method. One one hand, the elbow method shows evaluates how the within-cluster variance decreases as the number of cluster decreases. In the other hands, the silhouette method measures how well each observation fits within its assigned cluster. Both figures are presented above. As we can see, the suggested number of clusters is 4. 
 
 # Question 2.
 Run a k-means cluster analysis using the number of clusters identified in Question 1. Create bar plots to
