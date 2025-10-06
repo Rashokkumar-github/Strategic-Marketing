@@ -1,7 +1,19 @@
 ---
-title: "Assignment3_code"
-output: html_document
+title: "Assignment 3"
+subtitle: "Group Assignment 3"
+author:
+  - "Rishi Ashok Kumar (560527)"
+  - "Nicolas Gonzalez (780037)"
+  - "Aleksandra Tatko (648925)"
+  - "André van der Meij (589994)"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup}
@@ -9,9 +21,9 @@ date: "`r format(Sys.Date(), '%B %d, %Y')`"
 library(tidyverse)
 library(factoextra)
 library(cluster)
-
+getwd()
 # Load dataset
-hotel_customers <- read.csv("/Users/andrejr/Documents/Universiteit/MSc Data Science & Marketing Analytics/Strategic Marketing Decision Making/Group assignment 3/HotelCustomersSubset_sample.csv")
+hotel_customers <- read.csv("/Users/nico/Documents/EUR/Marketing/Assignment/Strategic-Marketing/Assignments/HotelCustomersSubset_sample.csv")
 
 # Quick look at the data
 str(hotel_customers)
@@ -31,7 +43,7 @@ hotel_customers <- hotel_customers %>%
   filter(!is.na(Age) & Age >= 18 & Age <= 95)
 ```
 
-```{r select data include=FALSE}
+```{r include=FALSE}
 # Select the variables
 selected_variables <- c(
   "Age","AverageLeadTime","DaysSinceCreation",
@@ -46,17 +58,17 @@ analysis_data <- hotel_customers %>%
   drop_na()
 ```
 
-```{r scale include=FALSE}
+```{r scale, include=FALSE}
 # Standardize all variables
 analysis_data_scaled <- scale(analysis_data)
 ```
 
-```{r scale include=FALSE}
+```{r scale1, include=FALSE}
 # Standardize all variables
 analysis_data_scaled <- scale(analysis_data)
 ```
 
-```{r optimal k include=FALSE}
+```{r optimalk,  include=FALSE}
 # Check with elbow method
 fviz_nbclust(analysis_data_scaled, kmeans, method = "wss", k.max = 13) 
 
@@ -68,7 +80,7 @@ So in both cases k seems to be the optimal number of cluster
 Elbow method: the curve starts to flatten after k = 4
 Silhouette method: highest average silhouette width at k = 4
 
-```{r kmeans include=FALSE}
+```{r kmeans , include=FALSE}
 # Perform k
 kmeans_result <- kmeans(analysis_data_scaled, centers = 4, nstart = 25)
 
@@ -79,7 +91,7 @@ hotel_customers$Cluster <- as.factor(kmeans_result$cluster)
 - centers = 4, the found in Q1
 - nstart = 25, → runs the algorithm 25 times with different starting points, after it keeps the best result -> this reduces the chance of getting stuck in a local minimum, as mentioned in Lecture 6 (slide 43)
 
-```{r plot cluster sizes include=FALSE}
+```{r plotclustersizes, include=FALSE}
 # Create data frame
 cluster_sizes <- data.frame(
   Cluster = factor(1:4),
@@ -87,7 +99,7 @@ cluster_sizes <- data.frame(
 )
 
 # Plot cluster sizes
-ggplot(cluster_sizes, aes(x = Cluster, y = Size, fill = Cluster)) +
+p3 <- ggplot(cluster_sizes, aes(x = Cluster, y = Size, fill = Cluster)) +
   geom_col(show.legend = FALSE) +
   labs(
     title = "Cluster Sizes",
@@ -95,9 +107,10 @@ ggplot(cluster_sizes, aes(x = Cluster, y = Size, fill = Cluster)) +
     y = "Number of Customers"
   ) +
   theme_minimal()
+print(p3)
 ```
 
-```{r plot segmentation solution include=FALSE}
+```{r plotsegmentationsolution , include=FALSE}
 # Visualize the 4-cluster segmentation solution
 fviz_cluster(kmeans_result, data = analysis_data_scaled,
              ellipse.type = "norm",
@@ -106,7 +119,7 @@ fviz_cluster(kmeans_result, data = analysis_data_scaled,
              main = "K-Means Segmentation Solution") +
   theme_minimal(base_size = 13)
 ```
-```{r plot segmentation solution include=FALSE}
+```{r plotsegmentationsolution1, include=FALSE}
 # Compute the mean of each variable per cluster
 cluster_profile <- hotel_customers %>%
   group_by(Cluster) %>%
@@ -135,7 +148,7 @@ ggplot(cluster_profile, aes(x = Variable, y = Average, fill = Cluster)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-```{r lodging revenue include=FALSE}
+```{r lodgingrevenue, include=FALSE}
 # Compute average and total revenues per cluster
 lodging_plot <- hotel_customers %>%
   group_by(Cluster) %>%
@@ -153,7 +166,7 @@ lodging_plot <- hotel_customers %>%
 lodging_plot
 ```
 
-```{r other revenue include=FALSE}
+```{r otherrevenue include=FALSE}
 other_plot <- hotel_customers %>%
   group_by(Cluster) %>%
   summarise(avg_otherrevenue = mean(OtherRevenue, na.rm = TRUE)) %>%
